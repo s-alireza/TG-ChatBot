@@ -4,11 +4,11 @@
 type Bindings = {
     TG_BOT_KV: KVNamespace;
     TELEGRAM_TOKEN: string;
-    GEMINI_API_KEY: string;
-    GROQ_API_KEY: string;
-    ACCESS_MODE: string;          // "public" or "private"
-    ALLOWED_USER_IDS: string;     // Comma-separated user IDs
-    WEBHOOK_SECRET?: string; // Optional security headers
+    GEMINI_API_KEY?: string;  // Optional - can be set via bot
+    GROQ_API_KEY?: string;    // Optional - can be set via bot
+    ACCESS_MODE?: string;     // "public" or "private"
+    ALLOWED_USER_IDS?: string; // Comma-separated user IDs
+    WEBHOOK_SECRET?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -63,51 +63,16 @@ Your tone should be professional, helpful, and well-rounded. Be detailed, factua
 Encourage learning and critical thinking. Be deep, meaningful, and accurate.
 Do not use LaTeX formatting for math (like \[ \] or \sqrt or anything starting with \). Use standard Unicode symbols (e.g. √, ×, ≈) and plain text for equations to ensure they render correctly on Telegram. Avoid using tables.`;
 
-// Content Prompts
-const PROMPT_INSPIRE = "Tell me a fascinating, lesser-known scientific or interesting fact. Keep it concise and engaging.";
-const PROMPT_MOTIVATE = "Write a short, elegant, and motivational message to encourage productivity and positive thinking.";
 
-// Keyboards
+
+// Keyboards (Language selection only - model keyboard is now dynamic)
 const KEYBOARDS = {
     en: {
-
-        model: {
-            keyboard: [
-                [{ text: '🤖 GPT OSS (120B)' }],
-                [{ text: '🥣 Compound (Groq)' }],
-                [{ text: '👁️ Llama 3.2 (Vision)' }, { text: '🦄 Llama 4 (17B)' }],
-                [{ text: '🦙 Llama 3.3 (70B)' }, { text: '🐉 Qwen 3 (32B)' }],
-                [{ text: '🚀 Gemini 3.0 (flash)' }, { text: '⚡ Gemini 2.5 (flash)' }],
-                [{ text: '🪶 Gemini 2.5 (Lite)' }, { text: '💎 Gemma 3 (27B)' }]
-            ],
-            resize_keyboard: true,
-            one_time_keyboard: true,
-        },
         lang: {
             keyboard: [
-                [{ text: 'English 🇬🇧' }, { text: 'Persian 🇮🇷' }]
-            ],
-            resize_keyboard: true,
-            one_time_keyboard: true,
-        }
-    },
-    fa: {
-
-        model: {
-            keyboard: [
-                [{ text: '🤖 جی‌پی‌تی (120B)' }],
-                [{ text: '🥣 کامپاند (Groq)' }],
-                [{ text: '👁️ لاما 3.2 (Vision)' }, { text: '🦄 لاما 4 (17B)' }],
-                [{ text: '🦙 لاما 3.3 (70B)' }, { text: '🐉 کوین 3 (32B)' }],
-                [{ text: '🚀 جمنای 3.0 (Flash)' }, { text: '⚡ جمنای 2.5 (Flash)' }],
-                [{ text: '🪶 جمنای 2.5 (Lite)' }, { text: '💎 Gemma 3 (27B)' }]
-            ],
-            resize_keyboard: true,
-            one_time_keyboard: true,
-        },
-        lang: {
-            keyboard: [
-                [{ text: 'English 🇬🇧' }, { text: 'Persian 🇮🇷' }]
+                [{ text: 'English 🇬🇧' }, { text: 'فارسی 🇮🇷' }],
+                [{ text: 'Русский 🇷🇺' }, { text: '中文 🇨🇳' }],
+                [{ text: 'العربية 🇸🇦' }, { text: 'Español 🇪🇸' }]
             ],
             resize_keyboard: true,
             one_time_keyboard: true,
@@ -115,13 +80,44 @@ const KEYBOARDS = {
     }
 };
 
+// Dynamic Model Keyboard Generator (shows 🔒 for unavailable Gemini models)
+function getModelKeyboard(lang: string, hasGeminiKey: boolean) {
+    const isFa = lang === 'fa';
+    const lock = hasGeminiKey ? '' : ' 🔒';
+
+    if (isFa) {
+        return {
+            keyboard: [
+                [{ text: '🤖 جی‌پی‌تی (120B)' }],
+                [{ text: '🥣 کامپاند (Groq)' }],
+                [{ text: '👁️ لاما 3.2 (Vision)' }, { text: '🦄 لاما 4 (17B)' }],
+                [{ text: '🦙 لاما 3.3 (70B)' }, { text: '🐉 کوین 3 (32B)' }],
+                [{ text: `🚀 جمنای 3.0 (Flash)${lock}` }, { text: `⚡ جمنای 2.5 (Flash)${lock}` }],
+                [{ text: `🪶 جمنای 2.5 (Lite)${lock}` }, { text: `💎 Gemma 3 (27B)${lock}` }]
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: true,
+        };
+    } else {
+        return {
+            keyboard: [
+                [{ text: '🤖 GPT OSS (120B)' }],
+                [{ text: '🥣 Compound (Groq)' }],
+                [{ text: '👁️ Llama 3.2 (Vision)' }, { text: '🦄 Llama 4 (17B)' }],
+                [{ text: '🦙 Llama 3.3 (70B)' }, { text: '🐉 Qwen 3 (32B)' }],
+                [{ text: `🚀 Gemini 3.0 (flash)${lock}` }, { text: `⚡ Gemini 2.5 (flash)${lock}` }],
+                [{ text: `🪶 Gemini 2.5 (Lite)${lock}` }, { text: `💎 Gemma 3 (27B)${lock}` }]
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: true,
+        };
+    }
+}
+
 // Model Mapping (Hybrid Manual/Auto)
+// Includes both unlocked and locked (🔒) versions for Gemini models
 const MODEL_MAP: { [key: string]: string } = {
-    // English Keys
-    '⚡ Gemini 2.5 (flash)': 'gemini-2.5-flash',
-    '🪶 Gemini 2.5 (Lite)': 'gemini-2.5-flash-lite',
-    '🚀 Gemini 3.0 (flash)': 'gemini-3-flash-preview',
-    '💎 Gemma 3 (27B)': 'gemma-3-27b-it',
+    // English Keys - Groq models
     '🤖 GPT OSS (120B)': 'openai/gpt-oss-120b',
     '🦙 Llama 3.3 (70B)': 'llama-3.3-70b-versatile',
     '🦄 Llama 4 (17B)': 'meta-llama/llama-4-maverick-17b-128e-instruct',
@@ -129,17 +125,37 @@ const MODEL_MAP: { [key: string]: string } = {
     '👁️ Llama 3.2 (Vision)': 'llama-3.2-90b-vision-preview',
     '🥣 Compound (Groq)': 'groq/compound',
 
-    // Farsi Keys
-    '⚡ جمنای 2.5 (Flash)': 'gemini-2.5-flash',
-    '🪶 جمنای 2.5 (Lite)': 'gemini-2.5-flash-lite',
-    '🚀 جمنای 3.0 (Flash)': 'gemini-3-flash-preview',
-    '💎 جما 3 (27B)': 'gemma-3-27b-it',
+    // English Keys - Gemini models (unlocked)
+    '⚡ Gemini 2.5 (flash)': 'gemini-2.5-flash',
+    '🪶 Gemini 2.5 (Lite)': 'gemini-2.5-flash-lite',
+    '🚀 Gemini 3.0 (flash)': 'gemini-3-flash-preview',
+    '💎 Gemma 3 (27B)': 'gemma-3-27b-it',
+
+    // English Keys - Gemini models (locked versions)
+    '⚡ Gemini 2.5 (flash) 🔒': 'gemini-2.5-flash',
+    '🪶 Gemini 2.5 (Lite) 🔒': 'gemini-2.5-flash-lite',
+    '🚀 Gemini 3.0 (flash) 🔒': 'gemini-3-flash-preview',
+    '💎 Gemma 3 (27B) 🔒': 'gemma-3-27b-it',
+
+    // Farsi Keys - Groq models
     '🤖 جی‌پی‌تی (120B)': 'openai/gpt-oss-120b',
     '🦙 لاما 3.3 (70B)': 'llama-3.3-70b-versatile',
     '🦄 لاما 4 (17B)': 'meta-llama/llama-4-maverick-17b-128e-instruct',
     '🐉 کوین 3 (32B)': 'qwen/qwen3-32b',
     '👁️ لاما 3.2 (Vision)': 'llama-3.2-90b-vision-preview',
     '🥣 کامپاند (Groq)': 'groq/compound',
+
+    // Farsi Keys - Gemini models (unlocked)
+    '⚡ جمنای 2.5 (Flash)': 'gemini-2.5-flash',
+    '🪶 جمنای 2.5 (Lite)': 'gemini-2.5-flash-lite',
+    '🚀 جمنای 3.0 (Flash)': 'gemini-3-flash-preview',
+    '💎 جما 3 (27B)': 'gemma-3-27b-it',
+
+    // Farsi Keys - Gemini models (locked versions)
+    '⚡ جمنای 2.5 (Flash) 🔒': 'gemini-2.5-flash',
+    '🪶 جمنای 2.5 (Lite) 🔒': 'gemini-2.5-flash-lite',
+    '🚀 جمنای 3.0 (Flash) 🔒': 'gemini-3-flash-preview',
+    '💎 جما 3 (27B) 🔒': 'gemma-3-27b-it',
 };
 
 const GLOBAL_FALLBACK_ORDER = [
@@ -154,6 +170,147 @@ const GLOBAL_FALLBACK_ORDER = [
     'gemini-2.5-flash-lite',
     'gemma-3-27b-it'
 ];
+
+// --- SETUP WIZARD ---
+// Checks if bot is configured (has Groq API key)
+async function isConfigured(kv: KVNamespace): Promise<boolean> {
+    const groqKey = await kv.get('config:groq_key');
+    return !!groqKey;
+}
+
+// Get API keys from KV (fallback to env)
+async function getGroqKey(kv: KVNamespace, env: Bindings): Promise<string | null> {
+    const kvKey = await kv.get('config:groq_key');
+    return kvKey || env.GROQ_API_KEY || null;
+}
+
+async function getGeminiKey(kv: KVNamespace, env: Bindings): Promise<string | null> {
+    const kvKey = await kv.get('config:gemini_key');
+    return kvKey || env.GEMINI_API_KEY || null;
+}
+
+// Setup steps: 0 = asking for Groq key, 1 = asking for Gemini key
+async function handleSetupWizard(
+    chatId: number,
+    userId: number,
+    text: string,
+    env: Bindings
+): Promise<{ handled: boolean; response?: string }> {
+    const kv = env.TG_BOT_KV;
+
+    // Check if already configured
+    if (await isConfigured(kv)) {
+        return { handled: false };
+    }
+
+    // First user becomes owner
+    const ownerId = await kv.get('config:owner_id');
+    if (!ownerId) {
+        await kv.put('config:owner_id', userId.toString());
+    } else if (ownerId !== userId.toString()) {
+        return {
+            handled: true,
+            response: "⛔ This bot is being configured by another user. Please wait."
+        };
+    }
+
+    // Get current setup step
+    const step = await kv.get(`setup_step:${userId}`) || '0';
+
+    // Handle /start or first message
+    if (step === '0' && !text.startsWith('gsk_')) {
+        await kv.put(`setup_step:${userId}`, '0');
+        return {
+            handled: true,
+            response: `🤖 *Welcome to TG-ChatBot Setup!*
+
+Let's configure your bot in 2 simple steps.
+
+*Step 1/2:* Send me your *Groq API Key*
+Get it free from: console.groq.com/keys
+
+_Your key should start with \`gsk_\`_`
+        };
+    }
+
+    // Step 0: Waiting for Groq API Key
+    if (step === '0') {
+        if (text.startsWith('gsk_') && text.length > 20) {
+            // Validate by making a test call
+            const isValid = await validateGroqKey(text);
+            if (isValid) {
+                await kv.put('config:groq_key', text);
+                await kv.put(`setup_step:${userId}`, '1');
+                return {
+                    handled: true,
+                    response: `✅ *Groq API Key saved!*
+
+*Step 2/2:* Send me your *Gemini API Key* (optional)
+Get it from: aistudio.google.com/app/apikey
+
+_Or send \`skip\` to use Groq only_`
+                };
+            } else {
+                return {
+                    handled: true,
+                    response: "❌ Invalid Groq API Key. Please check and try again.\n\n_The key should start with `gsk_`_"
+                };
+            }
+        } else {
+            return {
+                handled: true,
+                response: "Please send a valid Groq API Key.\n_It should start with `gsk_`_"
+            };
+        }
+    }
+
+    // Step 1: Waiting for Gemini API Key
+    if (step === '1') {
+        if (text.toLowerCase() === 'skip') {
+            await kv.put('config:gemini_key', '');
+            await kv.put('config:setup_complete', 'true');
+            await kv.delete(`setup_step:${userId}`);
+            return {
+                handled: true,
+                response: `🎉 *Setup Complete!*
+
+Your bot is ready to use!
+Send me any message to start chatting.`
+            };
+        } else if (text.startsWith('AI') && text.length > 20) {
+            // Gemini keys typically start with "AI"
+            await kv.put('config:gemini_key', text);
+            await kv.put('config:setup_complete', 'true');
+            await kv.delete(`setup_step:${userId}`);
+            return {
+                handled: true,
+                response: `🎉 *Setup Complete!*
+
+Both API keys are configured!
+Send me any message to start chatting.`
+            };
+        } else {
+            return {
+                handled: true,
+                response: "Please send a valid Gemini API Key or type `skip` to continue without it."
+            };
+        }
+    }
+
+    return { handled: false };
+}
+
+// Validate Groq API Key
+async function validateGroqKey(key: string): Promise<boolean> {
+    try {
+        const response = await fetch('https://api.groq.com/openai/v1/models', {
+            headers: { 'Authorization': `Bearer ${key}` }
+        });
+        return response.ok;
+    } catch {
+        return false;
+    }
+}
 
 // --- ROUTES ---
 
@@ -356,9 +513,29 @@ app.post('/webhook', async (c) => {
     const message = update.message;
     if (!message) return c.json({ ok: true });
 
-    // Determine content (Text OR Caption OR Visual only)
-    // Determine content (Text OR Caption OR Visual only)
+    const chatId = message.chat.id;
+    const userId = message.from.id;
     let text = message.text || message.caption || '';
+
+    // 2. Check if bot needs setup (before any other processing)
+    const setupResult = await handleSetupWizard(chatId, userId, text, env);
+    if (setupResult.handled) {
+        if (setupResult.response) {
+            await sendMessage(chatId, setupResult.response, env.TELEGRAM_TOKEN);
+        }
+        return c.json({ ok: true });
+    }
+
+    // 3. Get API keys from KV (with env fallback)
+    const groqApiKey = await getGroqKey(env.TG_BOT_KV, env);
+    const geminiApiKey = await getGeminiKey(env.TG_BOT_KV, env);
+
+    // If still no Groq key, something went wrong
+    if (!groqApiKey) {
+        await sendMessage(chatId, "⚠️ Bot not configured. Please contact the owner.", env.TELEGRAM_TOKEN);
+        return c.json({ ok: true });
+    }
+
     let isVoiceMessage = false;
 
 
@@ -390,7 +567,7 @@ app.post('/webhook', async (c) => {
         const fileBuffer = await getTelegramFileBuffer(message.voice.file_id, env.TELEGRAM_TOKEN);
         if (fileBuffer) {
             try {
-                text = await transcribeAudio(fileBuffer.buffer, env.GROQ_API_KEY);
+                text = await transcribeAudio(fileBuffer.buffer, groqApiKey);
                 isVoiceMessage = true;
                 await sendMessage(message.chat.id, `📝 You said: '${text}'`, env.TELEGRAM_TOKEN);
             } catch (e: any) {
@@ -403,12 +580,10 @@ app.post('/webhook', async (c) => {
     // Ignore if strictly empty (no text AND no media)
     if (!text && !mediaData) return c.json({ ok: true });
 
-    const chatId = message.chat.id;
-    const userId = message.from.id;
 
-    // 2. Authorization Check (configurable public/private)
+    // 4. Authorization Check (configurable public/private)
     if (env.ACCESS_MODE === 'private') {
-        const allowedIds = env.ALLOWED_USER_IDS.split(',').map(id => id.trim());
+        const allowedIds = (env.ALLOWED_USER_IDS || '').split(',').map(id => id.trim());
         if (!allowedIds.includes(userId.toString())) {
             console.log(`Unauthorized access attempt from: ${userId}`);
             await sendMessage(chatId, "Access Denied ⛔\nYou are not authorized to use this bot.", env.TELEGRAM_TOKEN);
@@ -419,12 +594,12 @@ app.post('/webhook', async (c) => {
 
     // 3. Language Check
     const langKey = `lang:${userId}`;
-    let userLang = await env.TG_BOT_KV.get(langKey) as 'en' | 'fa';
+    let userLang = await env.TG_BOT_KV.get(langKey);
 
     // Handle Change Language
-    if (text.includes('Change Language') || text.includes('تغییر زبان')) {
+    if (text.includes('Change Language') || text.includes('تغییر زبان') || text.includes('Сменить язык') || text.includes('更改语言') || text.includes('تغيير اللغة') || text.includes('Cambiar Idioma')) {
         await env.TG_BOT_KV.delete(langKey);
-        await sendMessage(chatId, "Please choose your language / لطفا زبان خود را انتخاب کنید:", env.TELEGRAM_TOKEN, KEYBOARDS.en.lang);
+        await sendMessage(chatId, "Please choose your language:", env.TELEGRAM_TOKEN, KEYBOARDS.en.lang);
         return c.json({ ok: true });
     }
 
@@ -443,11 +618,23 @@ app.post('/webhook', async (c) => {
         if (text.includes('English')) {
             await env.TG_BOT_KV.put(langKey, 'en');
             await sendMessage(chatId, "Language set to English! 🇬🇧\nHello! I'm your AI assistant.", env.TELEGRAM_TOKEN, getMainKeyboard('en', activeModel));
-        } else if (text.includes('Persian') || text.includes('فارسی')) {
+        } else if (text.includes('فارسی') || text.includes('Persian')) {
             await env.TG_BOT_KV.put(langKey, 'fa');
             await sendMessage(chatId, "زبان روی فارسی تنظیم شد! 🇮🇷\nسلام! من دستیار هوش مصنوعی شما هستم.", env.TELEGRAM_TOKEN, getMainKeyboard('fa', activeModel));
+        } else if (text.includes('Русский')) {
+            await env.TG_BOT_KV.put(langKey, 'ru');
+            await sendMessage(chatId, "Язык установлен на Русский! 🇷🇺\nПривет! Я ваш ИИ-помощник.", env.TELEGRAM_TOKEN, getMainKeyboard('ru', activeModel));
+        } else if (text.includes('中文')) {
+            await env.TG_BOT_KV.put(langKey, 'zh');
+            await sendMessage(chatId, "语言已设置为中文! 🇨🇳\n你好！我是你的AI助手。", env.TELEGRAM_TOKEN, getMainKeyboard('zh', activeModel));
+        } else if (text.includes('العربية')) {
+            await env.TG_BOT_KV.put(langKey, 'ar');
+            await sendMessage(chatId, "تم ضبط اللغة على العربية! 🇸🇦\nأهلاً! أنا مساعد الذكاء الاصطناعي الخاص بك.", env.TELEGRAM_TOKEN, getMainKeyboard('ar', activeModel));
+        } else if (text.includes('Español')) {
+            await env.TG_BOT_KV.put(langKey, 'es');
+            await sendMessage(chatId, "¡Idioma configurado en Español! 🇪🇸\n¡Hola! Soy tu asistente de IA.", env.TELEGRAM_TOKEN, getMainKeyboard('es', activeModel));
         } else {
-            await sendMessage(chatId, "Please choose your language / لطفا زبان خود را انتخاب کنید:", env.TELEGRAM_TOKEN, KEYBOARDS.en.lang);
+            await sendMessage(chatId, "Please choose your language:", env.TELEGRAM_TOKEN, KEYBOARDS.en.lang);
         }
         return c.json({ ok: true });
     }
@@ -471,20 +658,42 @@ app.post('/webhook', async (c) => {
         'gemini-3-pro-preview': '3.0 Pro'
     };
 
-    function getMainKeyboard(lang: 'en' | 'fa', currentModelId: string) {
+    function getMainKeyboard(lang: string, currentModelId: string) {
         const modelName = MODEL_NAMES[currentModelId] || 'Unknown';
-        const isFa = lang === 'fa';
 
-        // Dynamic Button Text
-        const brainText = isFa
-            ? `🧠 مدل: ${modelName}` // Model: Name
-            : `🧠 Brain: ${modelName}`;
+        // Localized strings
+        let conversationsText = '✨ New Conversation';
+        let brainLabel = '🧠 Brain';
+        let langLabel = '🌐 Change Language';
+
+        if (lang === 'fa') {
+            conversationsText = '✨ گفتگوی جدید';
+            brainLabel = '🧠 مدل';
+            langLabel = '🌐 تغییر زبان';
+        } else if (lang === 'ru') {
+            conversationsText = '✨ Новый чат';
+            brainLabel = '🧠 Модель';
+            langLabel = '🌐 Сменить язык';
+        } else if (lang === 'zh') {
+            conversationsText = '✨ 新对话';
+            brainLabel = '🧠 模型';
+            langLabel = '🌐 更改语言';
+        } else if (lang === 'ar') {
+            conversationsText = '✨ محادثة جديدة';
+            brainLabel = '🧠 نموذج';
+            langLabel = '🌐 تغيير اللغة';
+        } else if (lang === 'es') {
+            conversationsText = '✨ Nueva Conversación';
+            brainLabel = '🧠 Cerebro';
+            langLabel = '🌐 Cambiar Idioma';
+        }
+
+        const brainText = `${brainLabel}: ${modelName}`;
 
         return {
             keyboard: [
-                [{ text: isFa ? '✨ موضوع جدید' : '✨ New Topic' }, { text: isFa ? '💡 الهام بخش' : '💡 Inspire Me' }],
-                [{ text: isFa ? '💌 برای تو' : '💌 For You' }],
-                [{ text: brainText }, { text: isFa ? '🌐 تغییر زبان' : '🌐 Change Language' }]
+                [{ text: conversationsText }],
+                [{ text: brainText }, { text: langLabel }]
             ],
             resize_keyboard: true,
             persistent_keyboard: true,
@@ -493,22 +702,32 @@ app.post('/webhook', async (c) => {
 
     // Generate Dynamic Keyboard
     const isPersian = userLang === 'fa';
+    const hasGeminiKey = !!geminiApiKey;
     const currentKeyboard = getMainKeyboard(userLang, activeModel);
-    const modelKeyboard = isPersian ? KEYBOARDS.fa.model : KEYBOARDS.en.model;
+    const modelKeyboard = getModelKeyboard(userLang, hasGeminiKey);
 
     // Adjust System Prompt based on Mode
     let localizedSystemPrompt = SYSTEM_PROMPT;
 
     if (isVoiceMessage) {
-        // Voice Mode: English only, ~1 minute speech (750 chars for Groq TTS).
-        localizedSystemPrompt += " Respond in English ONLY. Keep your response conversational and under 750 characters.";
+        // Voice Mode: Keep response conversational and short
+        localizedSystemPrompt += " Keep your response conversational and under 750 characters.";
+
+        if (userLang === 'en') localizedSystemPrompt += " Respond in English.";
+        else if (userLang === 'fa') localizedSystemPrompt += " Respond in Persian/Farsi.";
+        else if (userLang === 'ru') localizedSystemPrompt += " Respond in Russian.";
+        else if (userLang === 'zh') localizedSystemPrompt += " Respond in Chinese.";
+        else if (userLang === 'ar') localizedSystemPrompt += " Respond in Arabic.";
+        else if (userLang === 'es') localizedSystemPrompt += " Respond in Spanish.";
     } else {
         // Text Mode: General Conciseness (Fit in one Telegram message ~4096 chars)
         localizedSystemPrompt += " Keep your response concise and under 4000 characters to fit in a single message.";
 
-        if (isPersian) {
-            localizedSystemPrompt += " Respond in Persian/Farsi. Be professional and academic.";
-        }
+        if (userLang === 'fa') localizedSystemPrompt += " Respond in Persian/Farsi. Be professional and academic.";
+        else if (userLang === 'ru') localizedSystemPrompt += " Respond in Russian.";
+        else if (userLang === 'zh') localizedSystemPrompt += " Respond in Chinese.";
+        else if (userLang === 'ar') localizedSystemPrompt += " Respond in Arabic.";
+        else if (userLang === 'es') localizedSystemPrompt += " Respond in Spanish.";
     }
 
     // 4. Command Handling (Only if text exists)
@@ -519,15 +738,39 @@ app.post('/webhook', async (c) => {
     }
 
     // --- MANUAL MODEL SELECTION ---
-    // Match "Change Brain" OR "Brain:" OR "مدل:"
-    if (text.includes('Change Brain') || text.includes('تغییر مغز') || text.includes('Brain:') || text.includes('مدل:')) {
-        const msg = isPersian ? "کدام مدل هوش مصنوعی را ترجیح می‌دهید؟ 🧠" : "Which AI model would you like to use? 🧠";
+    // Match "Change Brain" OR "Brain:" OR "مدل:" or translations
+    if (text.includes('Change Brain') || text.includes('تغییر مغز') || text.includes('Brain:') || text.includes('مدل:') || text.includes('Модель:') || text.includes('模型:') || text.includes('نموذج:') || text.includes('Cerebro:')) {
+        let msg = "Which AI model would you like to use? 🧠";
+        if (userLang === 'fa') msg = "کدام مدل هوش مصنوعی را ترجیح می‌دهید؟ 🧠";
+        else if (userLang === 'ru') msg = "Какую модель ИИ вы хотите использовать? 🧠";
+        else if (userLang === 'zh') msg = "您想使用哪个AI模型？ 🧠";
+        else if (userLang === 'ar') msg = "أي نموذج ذكاء اصطناعي تود استخدامه؟ 🧠";
+        else if (userLang === 'es') msg = "¿Qué modelo de IA te gustaría usar? 🧠";
+
         await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, modelKeyboard);
         return c.json({ ok: true });
     }
 
     if (MODEL_MAP[text]) {
         const selectedModel = MODEL_MAP[text];
+        const isGeminiModel = selectedModel.startsWith('gemini') || selectedModel.startsWith('gemma');
+
+        // Check if user is trying to select a locked Gemini model
+        if (isGeminiModel && !hasGeminiKey) {
+            const lockedMsg = isPersian
+                ? `⚠️ این مدل قفل است! 🔒
+
+برای استفاده از مدل‌های Gemini، ابتدا باید GEMINI_API_KEY را در تنظیمات اضافه کنید.
+
+💡 مدل‌های Groq (بدون علامت قفل) در دسترس هستند.`
+                : `⚠️ This model is locked! 🔒
+
+To use Gemini models, you need to add your GEMINI_API_KEY in the settings first.
+
+💡 Groq models (without 🔒) are available for use.`;
+            await sendMessage(chatId, lockedMsg, env.TELEGRAM_TOKEN, currentKeyboard);
+            return c.json({ ok: true });
+        }
 
         // Store explicit manual selection
         usage.manualModel = selectedModel;
@@ -543,9 +786,15 @@ app.post('/webhook', async (c) => {
 
 
 
-    if (text.includes('New Topic') || text.includes('موضوع جدید')) {
+    if (text.includes('New Conversation') || text.includes('گفتگوی جدید') || text.includes('Новый чат') || text.includes('新对话') || text.includes('محادثة جديدة') || text.includes('Nueva Conversación')) {
         await env.TG_BOT_KV.delete(`history:${userId}`);
-        const clearMsg = isPersian ? "حافظه پاک شد. موضوع بعدی چیست؟ ✨" : "Context cleared. Ready for a new topic. ✨";
+        let clearMsg = "Previous conversation cleared. I'm ready! ✨";
+        if (userLang === 'fa') clearMsg = "گفتگوی قبلی پاک شد. بفرمایید! ✨";
+        else if (userLang === 'ru') clearMsg = "Предыдущая переписка удалена. Я готов! ✨";
+        else if (userLang === 'zh') clearMsg = "上次对话已清除。我准备好了！✨";
+        else if (userLang === 'ar') clearMsg = "تم مسح المحادثة السابقة. أنا مستعد! ✨";
+        else if (userLang === 'es') clearMsg = "Conversación anterior borrada. ¡Estoy listo! ✨";
+
         await sendMessage(chatId, clearMsg, env.TELEGRAM_TOKEN, currentKeyboard);
         return c.json({ ok: true });
     }
@@ -561,17 +810,11 @@ app.post('/webhook', async (c) => {
         history = JSON.parse(historyData);
     }
 
-    if (text.includes('Inspire Me') || text.includes('الهام بخش')) {
-        promptToGemini = PROMPT_INSPIRE;
-    } else if (text.includes('For You') || text.includes('برای تو')) {
-        promptToGemini = PROMPT_MOTIVATE;
-    } else {
-        // Normal conversation
-        if (!promptToGemini && mediaData) {
-            promptToGemini = isPersian ? "لطفا این را تحلیل کنید." : "Please analyze this.";
-        }
-        history.push({ role: 'user', parts: [{ text: promptToGemini }] });
+    // Normal conversation
+    if (!promptToGemini && mediaData) {
+        promptToGemini = isPersian ? "لطفا این را تحلیل کنید." : "Please analyze this.";
     }
+    history.push({ role: 'user', parts: [{ text: promptToGemini }] });
 
     let initialModel = activeModel;
 
@@ -602,9 +845,9 @@ app.post('/webhook', async (c) => {
             if (history.length > 20) history = history.slice(history.length - 20);
 
             if (isGemini) {
-                aiResponse = await callGemini(env.GEMINI_API_KEY, localizedSystemPrompt, history, promptToGemini, attemptModel, mediaData);
+                aiResponse = await callGemini(geminiApiKey || '', localizedSystemPrompt, history, promptToGemini, attemptModel, mediaData);
             } else {
-                aiResponse = await callGroq(env.GROQ_API_KEY, localizedSystemPrompt, history, promptToGemini, attemptModel);
+                aiResponse = await callGroq(groqApiKey, localizedSystemPrompt, history, promptToGemini, attemptModel);
             }
 
             success = true;
@@ -680,7 +923,8 @@ app.post('/webhook', async (c) => {
                     let audioBuffer: ArrayBuffer;
                     try {
                         // Primary: Groq PlayAI TTS (~1 minute, 750 chars)
-                        audioBuffer = await generateSpeech(cleanText, env.GROQ_API_KEY);
+                        // Supports English and Arabic. Others will fall back to Google.
+                        audioBuffer = await generateSpeech(cleanText, groqApiKey, userLang || 'en');
                     } catch (groqError: any) {
                         console.error("Groq TTS Failed, regenerating for Google Fallback:", groqError);
                         await sendMessage(chatId, `⚠️ Primary TTS failed. Regenerating shorter response...`, env.TELEGRAM_TOKEN);
@@ -692,9 +936,9 @@ app.post('/webhook', async (c) => {
                         // Try to regenerate with current model
                         try {
                             if (activeModel.startsWith('gemini') || activeModel.startsWith('gemma')) {
-                                shortResponse = await callGemini(env.GEMINI_API_KEY, shortPrompt, [], text, activeModel, null);
+                                shortResponse = await callGemini(geminiApiKey || '', shortPrompt, [], text, activeModel, null);
                             } else {
-                                shortResponse = await callGroq(env.GROQ_API_KEY, shortPrompt, [], text, activeModel);
+                                shortResponse = await callGroq(groqApiKey, shortPrompt, [], text, activeModel);
                             }
                         } catch (regenError) {
                             console.error("Regeneration failed, using truncated response:", regenError);
@@ -707,7 +951,7 @@ app.post('/webhook', async (c) => {
                             .trim();
 
                         // Fallback: Google TTS (200 char limit)
-                        audioBuffer = await generateSpeechGoogle(shortClean, 'en');
+                        audioBuffer = await generateSpeechGoogle(shortClean, userLang || 'en');
                     }
 
                     await sendVoiceMessage(chatId, audioBuffer, env.TELEGRAM_TOKEN);
@@ -718,11 +962,8 @@ app.post('/webhook', async (c) => {
             }
 
             // 7. Update History (Only on Success)
-            if (!text.includes('Inspire Me') && !text.includes('For You') &&
-                !text.includes('الهام بخش') && !text.includes('برای تو')) {
-                history.push({ role: 'model', parts: [{ text: aiResponse }] });
-                await env.TG_BOT_KV.put(historyKey, JSON.stringify(history));
-            }
+            history.push({ role: 'model', parts: [{ text: aiResponse }] });
+            await env.TG_BOT_KV.put(historyKey, JSON.stringify(history));
         } else {
             // All models failed
             const errorMessage = isPersian
@@ -928,8 +1169,18 @@ async function transcribeAudio(audioBuffer: ArrayBuffer, apiKey: string, fileNam
     return data.text;
 }
 
-async function generateSpeech(text: string, apiKey: string): Promise<ArrayBuffer> {
+async function generateSpeech(text: string, apiKey: string, lang: string = 'en'): Promise<ArrayBuffer> {
     const url = `https://api.groq.com/openai/v1/audio/speech`;
+
+    let model = "playai-tts";
+    let voice = "Briggs-PlayAI";
+
+    if (lang === 'ar') {
+        model = "playai-tts-arabic";
+        voice = "Ahmad-PlayAI"; // Male Arabic voice
+    } else if (lang !== 'en') {
+        throw new Error(`Groq PlayAI does not support language: ${lang}`);
+    }
 
     const response = await fetch(url, {
         method: 'POST',
@@ -938,9 +1189,9 @@ async function generateSpeech(text: string, apiKey: string): Promise<ArrayBuffer
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            model: "playai-tts",
+            model: model,
             input: text,
-            voice: "Briggs-PlayAI"
+            voice: voice
         })
     });
 

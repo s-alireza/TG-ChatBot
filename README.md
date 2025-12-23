@@ -17,7 +17,9 @@ A free & fast personal AI chatbot for Telegram, powered by multiple AI models in
 
 ## 🚀 One-Click Deploy
 
-Click the button above to deploy your own bot in minutes! You'll need:
+Click the button above to deploy your own bot in minutes!
+
+### What You Need
 
 | Requirement | Where to Get |
 | --- | --- |
@@ -27,10 +29,14 @@ Click the button above to deploy your own bot in minutes! You'll need:
 | GitHub/GitLab Account | To store your cloned repo |
 | Cloudflare Account | Free tier works! |
 
-### After Deployment
+### Setup Steps
 
-1. **Click your worker URL** (shown after deployment, e.g., `https://tg-chatbot.your-name.workers.dev`)
-2. ✅ Webhook is set automatically! Message your bot on Telegram 🎉
+1. **Click the Deploy button** and enter your **Telegram Bot Token**
+2. After deployment, **click your worker URL** (e.g., `https://tg-chatbot.your-name.workers.dev`)
+3. ✅ Webhook is set automatically!
+4. **Message your bot on Telegram** - it will guide you to set up your API keys securely!
+
+> 💡 **Why this way?** Your API keys are entered directly in Telegram and stored securely. They're never exposed in public repositories or deploy forms!
 
 ---
 

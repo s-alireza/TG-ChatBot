@@ -18,21 +18,9 @@
             "vars": [
                 {
                     "name": "TELEGRAM_TOKEN",
-                    "description": "Your Telegram Bot Token (from @BotFather)",
+                    "description": "Your Bot Token from @BotFather on Telegram",
                     "secret": true,
                     "required": true
-                },
-                {
-                    "name": "GROQ_API_KEY",
-                    "description": "Groq API Key (from console.groq.com)",
-                    "secret": true,
-                    "required": true
-                },
-                {
-                    "name": "GEMINI_API_KEY",
-                    "description": "Google Gemini API Key (optional, leave empty to skip)",
-                    "secret": true,
-                    "required": false
                 }
             ]
         }
