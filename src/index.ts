@@ -75,8 +75,8 @@ const KEYBOARDS = {
             keyboard: [
                 [{ text: '🤖 GPT OSS (120B)' }],
                 [{ text: '🥣 Compound (Groq)' }],
-                [{ text: '👁️ Llama 3.2 (Vision)' }, { text: '� Llama 4 (17B)' }],
-                [{ text: '� Llama 3.3 (70B)' }, { text: '🐉 Qwen 3 (32B)' }],
+                [{ text: '👁️ Llama 3.2 (Vision)' }, { text: '🦄 Llama 4 (17B)' }],
+                [{ text: '🦙 Llama 3.3 (70B)' }, { text: '🐉 Qwen 3 (32B)' }],
                 [{ text: '🚀 Gemini 3.0 (flash)' }, { text: '⚡ Gemini 2.5 (flash)' }],
                 [{ text: '🪶 Gemini 2.5 (Lite)' }, { text: '💎 Gemma 3 (27B)' }]
             ],
@@ -97,8 +97,8 @@ const KEYBOARDS = {
             keyboard: [
                 [{ text: '🤖 جی‌پی‌تی (120B)' }],
                 [{ text: '🥣 کامپاند (Groq)' }],
-                [{ text: '👁️ لاما 3.2 (Vision)' }, { text: '� لاما 4 (17B)' }],
-                [{ text: '� لاما 3.3 (70B)' }, { text: '🐉 کوین 3 (32B)' }],
+                [{ text: '👁️ لاما 3.2 (Vision)' }, { text: '🦄 لاما 4 (17B)' }],
+                [{ text: '🦙 لاما 3.3 (70B)' }, { text: '🐉 کوین 3 (32B)' }],
                 [{ text: '🚀 جمنای 3.0 (Flash)' }, { text: '⚡ جمنای 2.5 (Flash)' }],
                 [{ text: '🪶 جمنای 2.5 (Lite)' }, { text: '💎 Gemma 3 (27B)' }]
             ],
@@ -201,11 +201,10 @@ app.post('/webhook', async (c) => {
         const fileBuffer = await getTelegramFileBuffer(message.voice.file_id, env.TELEGRAM_TOKEN);
         if (fileBuffer) {
             try {
-                await sendMessage(message.chat.id, "🎙️ Listening...", env.TELEGRAM_TOKEN);
                 text = await transcribeAudio(fileBuffer.buffer, env.GROQ_API_KEY);
                 isVoiceMessage = true;
-                await sendMessage(message.chat.id, `📝 You said: "${text}"`, env.TELEGRAM_TOKEN);
-            } catch (e) {
+                await sendMessage(message.chat.id, `📝 You said: '${text}'`, env.TELEGRAM_TOKEN);
+            } catch (e: any) {
                 console.error("Transcription failed", e);
                 await sendMessage(message.chat.id, "❌ Valid Error: Could not transcribe audio.", env.TELEGRAM_TOKEN);
             }
@@ -242,6 +241,11 @@ app.post('/webhook', async (c) => {
     const usageData = await env.TINA_BOT_KV.get(usageKey);
     const usage = usageData ? JSON.parse(usageData) : {};
     let activeModel = usage.manualModel || 'openai/gpt-oss-120b';
+
+    // Force Llama 3.3 for Voice to support Farsi/Smart replies
+    if (isVoiceMessage) {
+        activeModel = 'llama-3.3-70b-versatile';
+    }
 
     if (!userLang) {
         if (text.includes('English')) {
@@ -304,8 +308,8 @@ app.post('/webhook', async (c) => {
     let localizedSystemPrompt = SYSTEM_PROMPT;
 
     if (isVoiceMessage) {
-        // Voice Mode: Force English + Short Length (for TTS quality and 1-minute limit)
-        localizedSystemPrompt += " IMPORTANT: You MUST respond in ENGLISH only, even if the user speaks another language. Keep your response conversational, clear, and concise (maximum 100 words) so it fits in a 1-minute voice message.";
+        // Voice Mode: English only, ~1 minute speech (750 chars for Groq TTS).
+        localizedSystemPrompt += " Respond in English only. Keep your response conversational and under 750 characters.";
     } else {
         // Text Mode: General Conciseness (Fit in one Telegram message ~4096 chars)
         localizedSystemPrompt += " Keep your response concise and under 4000 characters to fit in a single message.";
@@ -472,17 +476,48 @@ app.post('/webhook', async (c) => {
             await sendMessage(chatId, aiResponse, env.TELEGRAM_TOKEN, currentKeyboard);
 
             // If user sent voice, reply with voice too (Always English now)
+            // If user sent voice, reply with voice too
             if (isVoiceMessage) {
-                // Generate Speech (Text will be in English due to system prompt override)
-                // Clean text for TTS (Remove Markdown chars like *, _, #, `)
+                // Generate Speech: Groq PlayAI (Primary) → Google TTS (Fallback with regenerated response)
                 const cleanText = aiResponse
                     .replace(/[*_#\`]/g, '') // Strip Markdown syntax
                     .replace(/⚠️.*?(\n|$)/g, '') // Remove warnings
                     .trim();
 
                 try {
-                    await sendMessage(chatId, "🗣️ Generating voice reply...", env.TELEGRAM_TOKEN);
-                    const audioBuffer = await generateSpeech(cleanText, env.GROQ_API_KEY);
+                    let audioBuffer: ArrayBuffer;
+                    try {
+                        // Primary: Groq PlayAI TTS (~1 minute, 750 chars)
+                        audioBuffer = await generateSpeech(cleanText, env.GROQ_API_KEY);
+                    } catch (groqError: any) {
+                        console.error("Groq TTS Failed, regenerating for Google Fallback:", groqError);
+                        await sendMessage(chatId, `⚠️ Primary TTS failed. Regenerating shorter response...`, env.TELEGRAM_TOKEN);
+
+                        // Regenerate AI response with 200 char limit for Google TTS
+                        const shortPrompt = localizedSystemPrompt.replace("under 750 characters", "under 200 characters");
+                        let shortResponse = "";
+
+                        // Try to regenerate with current model
+                        try {
+                            if (activeModel.startsWith('gemini') || activeModel.startsWith('gemma')) {
+                                shortResponse = await callGemini(env.GEMINI_API_KEY, shortPrompt, [], text, activeModel, null);
+                            } else {
+                                shortResponse = await callGroq(env.GROQ_API_KEY, shortPrompt, [], text, activeModel);
+                            }
+                        } catch (regenError) {
+                            console.error("Regeneration failed, using truncated response:", regenError);
+                            shortResponse = cleanText.substring(0, 200);
+                        }
+
+                        const shortClean = shortResponse
+                            .replace(/[*_#\`]/g, '')
+                            .replace(/⚠️.*?(\n|$)/g, '')
+                            .trim();
+
+                        // Fallback: Google TTS (200 char limit)
+                        audioBuffer = await generateSpeechGoogle(shortClean, 'en');
+                    }
+
                     await sendVoiceMessage(chatId, audioBuffer, env.TELEGRAM_TOKEN);
                 } catch (e: any) {
                     console.error("TTS Generation failed:", e);
@@ -948,6 +983,113 @@ const scheduled = async (event: any, env: Bindings, ctx: ExecutionContext) => {
         }
     }
 };
+
+// Helper Functions
+async function generateSpeechGoogle(text: string, lang: string): Promise<ArrayBuffer> {
+    // Google TTS (Unofficial) - ONLY works with SHORT text (~200 chars max)
+    // Longer text causes 400 errors from Cloudflare IPs.
+    let safeText = text.substring(0, 200);
+    if (lang === 'fa') {
+        safeText = "پیام شما دریافت شد"; // Farsi is blocked from Cloudflare
+    }
+
+    // googleapis.com + gtx works for short English text
+    const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=${lang}&q=${encodeURIComponent(safeText)}`;
+
+    console.log(`Google TTS Request (${lang}, ${safeText.length} chars)`);
+
+    const resp = await fetch(url, {
+        headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+    });
+
+    if (!resp.ok) throw new Error(`Google TTS failed: ${resp.status}`);
+    return await resp.arrayBuffer();
+}
+
+async function generateSpeechEdge(text: string, voice: string): Promise<ArrayBuffer> {
+    const requestId = crypto.randomUUID().replace(/-/g, '');
+    const url = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=${requestId}`;
+
+    return new Promise((resolve, reject) => {
+        const ws = new WebSocket(url);
+        const audioChunks: Uint8Array[] = [];
+        let lastReceivedText = "";
+
+        // Standard HTTP Date format (required by some Microsoft APIs)
+        const timestamp = new Date().toUTCString();
+
+        ws.addEventListener('open', () => {
+            console.log("EdgeTTS: Connected", { textLen: text.length });
+            // Reverted to 24khz as 16khz caused 1007 errors
+            const configMsg = `X-Timestamp:${timestamp}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n`;
+            ws.send(configMsg);
+
+            // Using Delay to prevent race condition
+            const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'><voice name='${voice}'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>${text}</prosody></voice></speak>`;
+            const ssmlMsg = `X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${timestamp}\r\nPath:ssml\r\n\r\n${ssml}`;
+
+            setTimeout(() => {
+                ws.send(ssmlMsg);
+            }, 250);
+        });
+
+        ws.addEventListener('message', async (event: any) => {
+            const data = event.data;
+            if (typeof data === 'string') {
+                lastReceivedText = data;
+                console.log("EdgeTTS Msg:", data);
+                if (data.includes('Path:turn.end')) {
+                    ws.close();
+                }
+            } else if (data instanceof ArrayBuffer || data instanceof Blob) {
+                let buffer: ArrayBuffer;
+                if (data instanceof Blob) {
+                    buffer = await data.arrayBuffer();
+                } else {
+                    buffer = data as ArrayBuffer;
+                }
+                const view = new Uint8Array(buffer);
+                let headerEnd = -1;
+                for (let i = 0; i < view.length - 3; i++) {
+                    if (view[i] === 13 && view[i + 1] === 10 && view[i + 2] === 13 && view[i + 3] === 10) {
+                        headerEnd = i + 3;
+                        break;
+                    }
+                }
+                if (headerEnd !== -1) {
+                    const headerBytes = view.slice(0, headerEnd);
+                    const headerStr = new TextDecoder().decode(headerBytes);
+                    if (headerStr.includes('Path:audio')) {
+                        audioChunks.push(view.slice(headerEnd + 1));
+                    }
+                }
+            }
+        });
+
+        ws.addEventListener('close', (event: any) => {
+            console.log(`EdgeTTS Closed: ${event.code} ${event.reason}`);
+            const totalLen = audioChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+            if (totalLen > 0) {
+                const completeAudio = new Uint8Array(totalLen);
+                let offset = 0;
+                for (const chunk of audioChunks) {
+                    completeAudio.set(chunk, offset);
+                    offset += chunk.length;
+                }
+                resolve(completeAudio.buffer);
+            } else {
+                reject(new Error(`No audio received from Edge TTS. Code: ${event.code}. Last Msg: ${lastReceivedText.substring(0, 200)}`));
+            }
+        });
+
+        ws.addEventListener('error', (e: any) => {
+            console.error("EdgeTTS Error:", e);
+            reject(new Error("WebSocket Error: " + (e.message || "Unknown")));
+        });
+    });
+}
 
 export default {
     fetch: app.fetch,
