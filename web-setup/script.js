@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- State ---
     // TODO: UPDATE THIS AFTER DEPLOYING PROXY
-    const DEFAULT_PROXY_URL = 'https://deploy-proxy.alirzw6070.workers.dev';
+    const DEFAULT_PROXY_URL = 'https://tg-bot-deploy-proxy.alirzw6070.workers.dev';
 
     // --- Event Listeners ---
 
