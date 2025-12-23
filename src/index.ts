@@ -158,6 +158,165 @@ const MODEL_MAP: { [key: string]: string } = {
     '💎 جما 3 (27B) 🔒': 'gemma-3-27b-it',
 };
 
+// --- HELPER CONSTANTS & FUNCTIONS (Top Level) ---
+
+const MODEL_NAMES: { [key: string]: string } = {
+    'gemini-3-flash-preview': '3.0 Flash',
+    'gemini-2.5-flash': '2.5 Flash',
+    'gemini-2.5-flash-lite': '2.5 Lite',
+    'gemma-3-27b-it': 'Gemma 3',
+    'openai/gpt-oss-120b': 'GPT OSS 120B',
+    'llama-3.3-70b-versatile': 'Llama 3.3',
+    'meta-llama/llama-4-maverick-17b-128e-instruct': 'Llama 4',
+    'qwen/qwen3-32b': 'Qwen 3',
+    'llama-3.2-90b-vision-preview': 'Llama 3.2 Vision',
+    'groq/compound': 'Compound',
+    // Legacy
+    'gemini-1.5-flash-latest': '1.5 Flash',
+    'gemini-2.0-flash-exp': '2.0 Exp',
+    'gemini-2.5-pro': '2.5 Pro',
+    'gemini-3-pro-preview': '3.0 Pro'
+};
+
+function getMainKeyboard(lang: string, currentModelId: string) {
+    const modelName = MODEL_NAMES[currentModelId] || 'Unknown';
+
+    // Localized strings
+    let conversationsText = '✨ New Conversation';
+    let brainLabel = '🧠 Brain';
+    let langLabel = '🌐 Change Language';
+    let settingsLabel = '⚙️ Settings';
+
+    if (lang === 'fa') {
+        conversationsText = '✨ گفتگوی جدید';
+        brainLabel = '🧠 مدل';
+        langLabel = '🌐 تغییر زبان';
+        settingsLabel = '⚙️ تنظیمات';
+    } else if (lang === 'ru') {
+        conversationsText = '✨ Новый чат';
+        brainLabel = '🧠 Модель';
+        langLabel = '🌐 Сменить язык';
+        settingsLabel = '⚙️ Настройки';
+    } else if (lang === 'zh') {
+        conversationsText = '✨ 新对话';
+        brainLabel = '🧠 模型';
+        langLabel = '🌐 更改语言';
+        settingsLabel = '⚙️ 设置';
+    } else if (lang === 'ar') {
+        conversationsText = '✨ محادثة جديدة';
+        brainLabel = '🧠 الدماغ';
+        langLabel = '🌐 تغيير اللغة';
+        settingsLabel = '⚙️ الإعدادات';
+    } else if (lang === 'es') {
+        conversationsText = '✨ Nueva conversación';
+        brainLabel = '🧠 Cerebro';
+        langLabel = '🌐 Cambiar Idioma';
+        settingsLabel = '⚙️ Configuración';
+    }
+
+    const brainText = `${brainLabel}: ${modelName}`;
+
+    return {
+        keyboard: [
+            [{ text: conversationsText }],
+            [{ text: brainText }],
+            [{ text: settingsLabel }, { text: langLabel }]
+        ],
+        resize_keyboard: true,
+        persistent_keyboard: true,
+    };
+}
+
+function getSettingsKeyboard(lang: string) {
+    if (lang === 'fa') {
+        return {
+            keyboard: [
+                [{ text: '🔑 کلیدهای API' }],
+                [{ text: '🔙 بازگشت' }]
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: true
+        };
+    } else {
+        // Default English
+        return {
+            keyboard: [
+                [{ text: '🔑 API Keys' }],
+                [{ text: '🔙 Back' }]
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: true
+        };
+    }
+}
+
+// Settings Handler
+async function handleSettings(chatId: number, userId: number, text: string, lang: string, env: Bindings) {
+    const isFa = lang === 'fa';
+    // Labels
+    const settingsParams = isFa ? ['⚙️ تنظیمات', '🔑 کلیدهای API', '🔙 بازگشت'] : ['⚙️ Settings', '🔑 API Keys', '🔙 Back'];
+    const [lblSettings, lblKeys, lblBack] = settingsParams;
+
+    // 1. Enter Settings Menu
+    if (text === lblSettings) {
+        const msg = isFa ? "⚙️ منوی تنظیمات:" : "⚙️ Settings Menu:";
+        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+        return true;
+    }
+
+    // 2. Back to Main
+    if (text === lblBack) {
+        const usageKey = `usage:${userId}`;
+        const usageData = await env.TG_BOT_KV.get(usageKey);
+        const usage = usageData ? JSON.parse(usageData) : {};
+        const activeModel = usage.manualModel || 'openai/gpt-oss-120b';
+
+        const msg = isFa ? "بازگشت به منوی اصلی." : "Back to main menu.";
+        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getMainKeyboard(lang, activeModel));
+        return true;
+    }
+
+    // 3. API Keys Menu
+    if (text === lblKeys) {
+        const currentGroq = await env.TG_BOT_KV.get(`config:groq_key:${userId}`) ? '✅ Custom Set' : '🌍 Default';
+        const currentGemini = await env.TG_BOT_KV.get(`config:gemini_key:${userId}`) ? '✅ Custom Set' : (env.GEMINI_API_KEY ? '🌍 System Default' : '❌ Not Set');
+
+        const msg = isFa
+            ? `🔑 *مدیریت کلیدهای API*\n\nوضعیت فعلی:\n• **Groq**: ${currentGroq}\n• **Gemini**: ${currentGemini}\n\nبرای تنظیم کلید جدید، آن را ارسال کنید:\n- \`gsk_...\` برای Groq\n- \`AI...\` برای Gemini\n\nبرای حذف کلید اختصاصی خود، بنویسید \`delete keys\`.`
+            : `🔑 *API Key Management*\n\nCurrent Status:\n• **Groq**: ${currentGroq}\n• **Gemini**: ${currentGemini}\n\nTo set a key, just send it here:\n- \`gsk_...\` for Groq\n- \`AI...\` for Gemini\n\nTo remove your custom keys, type \`delete keys\`.`;
+
+        // FIXED: Added getSettingsKeyboard here so user sees the 'Back' button
+        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+        return true;
+    }
+
+    // 4. Handle Key Inputs (Heuristic detection)
+    if (text.startsWith('gsk_') && text.length > 20) {
+        await env.TG_BOT_KV.put(`config:groq_key:${userId}`, text);
+        const msg = isFa ? "✅ کلید Groq اختصاصی شما ذخیره شد!" : "✅ Your custom Groq API Key has been saved!";
+        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+        return true;
+    }
+
+    if (text.startsWith('AI') && text.length > 20 && !text.includes(' ')) {
+        // Basic heuristic for Gemini keys (AIza...)
+        await env.TG_BOT_KV.put(`config:gemini_key:${userId}`, text);
+        const msg = isFa ? "✅ کلید Gemini اختصاصی شما ذخیره شد! مدل‌های جمنای باز شدند." : "✅ Your custom Gemini API Key has been saved! Gemini models unlocked.";
+        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+        return true;
+    }
+
+    if (text.toLowerCase() === 'delete keys') {
+        await env.TG_BOT_KV.delete(`config:groq_key:${userId}`);
+        await env.TG_BOT_KV.delete(`config:gemini_key:${userId}`);
+        const msg = isFa ? "🗑️ کلیدهای اختصاصی شما حذف شدند. از کلیدهای پیش‌فرض سیستم (در صورت وجود) استفاده خواهد شد." : "🗑️ Custom keys deleted. Reverted to system defaults (if available).";
+        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+        return true;
+    }
+
+    return false;
+}
+
 const GLOBAL_FALLBACK_ORDER = [
     'openai/gpt-oss-120b',
     'groq/compound',
@@ -652,163 +811,6 @@ app.post('/webhook', async (c) => {
             await sendMessage(chatId, "Please choose your language:", env.TELEGRAM_TOKEN, KEYBOARDS.en.lang);
         }
         return c.json({ ok: true });
-    }
-
-    // Short Names for Status Display
-    const MODEL_NAMES: { [key: string]: string } = {
-        'gemini-3-flash-preview': '3.0 Flash',
-        'gemini-2.5-flash': '2.5 Flash',
-        'gemini-2.5-flash-lite': '2.5 Lite',
-        'gemma-3-27b-it': 'Gemma 3',
-        'openai/gpt-oss-120b': 'GPT OSS 120B',
-        'llama-3.3-70b-versatile': 'Llama 3.3',
-        'meta-llama/llama-4-maverick-17b-128e-instruct': 'Llama 4',
-        'qwen/qwen3-32b': 'Qwen 3',
-        'llama-3.2-90b-vision-preview': 'Llama 3.2 Vision',
-        'groq/compound': 'Compound',
-        // Legacy
-        'gemini-1.5-flash-latest': '1.5 Flash',
-        'gemini-2.0-flash-exp': '2.0 Exp',
-        'gemini-2.5-pro': '2.5 Pro',
-        'gemini-3-pro-preview': '3.0 Pro'
-    };
-
-    function getMainKeyboard(lang: string, currentModelId: string) {
-        const modelName = MODEL_NAMES[currentModelId] || 'Unknown';
-
-        // Localized strings
-        let conversationsText = '✨ New Conversation';
-        let brainLabel = '🧠 Brain';
-        let langLabel = '🌐 Change Language';
-        let settingsLabel = '⚙️ Settings';
-
-        if (lang === 'fa') {
-            conversationsText = '✨ گفتگوی جدید';
-            brainLabel = '🧠 مدل';
-            langLabel = '🌐 تغییر زبان';
-            settingsLabel = '⚙️ تنظیمات';
-        } else if (lang === 'ru') {
-            conversationsText = '✨ Новый чат';
-            brainLabel = '🧠 Модель';
-            langLabel = '🌐 Сменить язык';
-            settingsLabel = '⚙️ Настройки';
-        } else if (lang === 'zh') {
-            conversationsText = '✨ 新对话';
-            brainLabel = '🧠 模型';
-            langLabel = '🌐 更改语言';
-            settingsLabel = '⚙️ 设置';
-        } else if (lang === 'ar') {
-            conversationsText = '✨ محادثة جديدة';
-            brainLabel = '🧠 نموذج';
-            langLabel = '🌐 تغيير اللغة';
-            settingsLabel = '⚙️ الإعدادات';
-        } else if (lang === 'es') {
-            conversationsText = '✨ Nueva conversación';
-            brainLabel = '🧠 Cerebro';
-            langLabel = '🌐 Cambiar Idioma';
-            settingsLabel = '⚙️ Configuración';
-        }
-
-        const brainText = `${brainLabel}: ${modelName}`;
-
-        return {
-            keyboard: [
-                [{ text: conversationsText }],
-                [{ text: brainText }],
-                [{ text: settingsLabel }, { text: langLabel }]
-            ],
-            resize_keyboard: true,
-            persistent_keyboard: true,
-        };
-    }
-
-    function getSettingsKeyboard(lang: string) {
-        if (lang === 'fa') {
-            return {
-                keyboard: [
-                    [{ text: '🔑 کلیدهای API' }],
-                    [{ text: '🔙 بازگشت' }]
-                ],
-                resize_keyboard: true,
-                one_time_keyboard: true
-            };
-        } else {
-            // Default English
-            return {
-                keyboard: [
-                    [{ text: '🔑 API Keys' }],
-                    [{ text: '🔙 Back' }]
-                ],
-                resize_keyboard: true,
-                one_time_keyboard: true
-            };
-        }
-    }
-
-    // Settings Handler
-    async function handleSettings(chatId: number, userId: number, text: string, lang: string, env: Bindings) {
-        const isFa = lang === 'fa';
-        // Labels
-        const settingsParams = isFa ? ['⚙️ تنظیمات', '🔑 کلیدهای API', '🔙 بازگشت'] : ['⚙️ Settings', '🔑 API Keys', '🔙 Back'];
-        const [lblSettings, lblKeys, lblBack] = settingsParams;
-
-        // 1. Enter Settings Menu
-        if (text === lblSettings) {
-            const msg = isFa ? "⚙️ منوی تنظیمات:" : "⚙️ Settings Menu:";
-            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
-            return true;
-        }
-
-        // 2. Back to Main
-        if (text === lblBack) {
-            const usageKey = `usage:${userId}`;
-            const usageData = await env.TG_BOT_KV.get(usageKey);
-            const usage = usageData ? JSON.parse(usageData) : {};
-            const activeModel = usage.manualModel || 'openai/gpt-oss-120b';
-
-            const msg = isFa ? "بازگشت به منوی اصلی." : "Back to main menu.";
-            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getMainKeyboard(lang, activeModel));
-            return true;
-        }
-
-        // 3. API Keys Menu
-        if (text === lblKeys) {
-            const currentGroq = await env.TG_BOT_KV.get(`config:groq_key:${userId}`) ? '✅ Custom Set' : '🌍 Default';
-            const currentGemini = await env.TG_BOT_KV.get(`config:gemini_key:${userId}`) ? '✅ Custom Set' : (env.GEMINI_API_KEY ? '🌍 System Default' : '❌ Not Set');
-
-            const msg = isFa
-                ? `🔑 *مدیریت کلیدهای API*\n\nوضعیت فعلی:\n• **Groq**: ${currentGroq}\n• **Gemini**: ${currentGemini}\n\nبرای تنظیم کلید جدید، آن را ارسال کنید:\n- \`gsk_...\` برای Groq\n- \`AI...\` برای Gemini\n\nبرای حذف کلید اختصاصی خود، بنویسید \`delete keys\`.`
-                : `🔑 *API Key Management*\n\nCurrent Status:\n• **Groq**: ${currentGroq}\n• **Gemini**: ${currentGemini}\n\nTo set a key, just send it here:\n- \`gsk_...\` for Groq\n- \`AI...\` for Gemini\n\nTo remove your custom keys, type \`delete keys\`.`;
-
-            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN);
-            return true;
-        }
-
-        // 4. Handle Key Inputs (Heuristic detection)
-        if (text.startsWith('gsk_') && text.length > 20) {
-            await env.TG_BOT_KV.put(`config:groq_key:${userId}`, text);
-            const msg = isFa ? "✅ کلید Groq اختصاصی شما ذخیره شد!" : "✅ Your custom Groq API Key has been saved!";
-            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
-            return true;
-        }
-
-        if (text.startsWith('AI') && text.length > 20 && !text.includes(' ')) {
-            // Basic heuristic for Gemini keys (AIza...)
-            await env.TG_BOT_KV.put(`config:gemini_key:${userId}`, text);
-            const msg = isFa ? "✅ کلید Gemini اختصاصی شما ذخیره شد! مدل‌های جمنای باز شدند." : "✅ Your custom Gemini API Key has been saved! Gemini models unlocked.";
-            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
-            return true;
-        }
-
-        if (text.toLowerCase() === 'delete keys') {
-            await env.TG_BOT_KV.delete(`config:groq_key:${userId}`);
-            await env.TG_BOT_KV.delete(`config:gemini_key:${userId}`);
-            const msg = isFa ? "🗑️ کلیدهای اختصاصی شما حذف شدند. از کلیدهای پیش‌فرض سیستم (در صورت وجود) استفاده خواهد شد." : "🗑️ Custom keys deleted. Reverted to system defaults (if available).";
-            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
-            return true;
-        }
-
-        return false;
     }
 
     // Generate Dynamic Keyboard
