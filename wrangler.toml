@@ -1,17 +1,15 @@
-name = "tina-chatbot"
+name = "tg-chatbot"
 compatibility_date = "2024-01-01"
 account_id = "9e0813edc223ca6ab3853bc3453a67c0"
 main = "src/index.ts"
 
-# Run `npx wrangler kv:namespace create TINA_BOT_KV` to get a valid ID and replace it here.
-# For local dev, a preview ID is handled automatically or can be specified.
 [[kv_namespaces]]
-binding = "TINA_BOT_KV"
-id = "f5a63df62b604e79b994f61818dfabcc"
+binding = "TG_BOT_KV"
+id = "4a838fa87b4243c0a10ef00fb0d287b3"
 
 [vars]
-# Placeholder for non-secret vars if any. Secrets should be set via `wrangler secret put`.
-# Secrets: TELEGRAM_TOKEN, GEMINI_API_KEY, GF_USER_ID, WEEKHOOK_SECRET, GROQ_API_KEY
-
-[triggers]
-crons = ["* * * * *"]
+TELEGRAM_TOKEN = "8449214105:AAFCKx9ddIe4vEmT3yrneMW7Wziw-JaAEHg"
+GEMINI_API_KEY = ""
+GROQ_API_KEY = "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"
+ACCESS_MODE = "public"
+ALLOWED_USER_IDS = ""

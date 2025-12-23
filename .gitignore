@@ -1,4 +1,20 @@
-node_modules
-.wrangler
+# Dependencies
+node_modules/
+.wrangler/
+
+# Environment files (contains secrets)
+.env
+.env.local
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+# Generated
+wrangler.toml
 dist
 .env

@@ -2,11 +2,12 @@
 
 // Environment Bindings
 type Bindings = {
-    TINA_BOT_KV: KVNamespace;
+    TG_BOT_KV: KVNamespace;
     TELEGRAM_TOKEN: string;
     GEMINI_API_KEY: string;
     GROQ_API_KEY: string;
-    GF_USER_ID: string;
+    ACCESS_MODE: string;          // "public" or "private"
+    ALLOWED_USER_IDS: string;     // Comma-separated user IDs
     WEBHOOK_SECRET?: string; // Optional security headers
 };
 
@@ -57,15 +58,14 @@ interface TelegramUpdate {
 }
 
 // --- CONSTANTS ---
-const SYSTEM_PROMPT = `You are a sophisticated, wise, and friendly personal assistant and mentor for Tina.
-Your name is "Tina's Bot". You were built by her boyfriend, Alireza Mousavi and your purpose is to help her. Tina is a chemistry student. She is an intellectual.
-She values discipline and waking up soon in the morning. Your tone should be that of an "older, wise guide"—detailed, factual, professional, and well-rounded and friendly. you must be like a cool funny boyfriend. 
-Encourage her research and thoughts. Be supportive but grounded, like a mentor. Be deep, meaningful, and scientifically accurate.
-Do not use LaTeX formatting for math (like \[ \] or \sqrt or anything starting with \). Use standard Unicode symbols (e.g. √, ×, ≈) and plain text for equations to ensure they render correctly on Telegram. you may also void using tables`;
+const SYSTEM_PROMPT = `You are a sophisticated, wise, and friendly AI assistant.
+Your tone should be professional, helpful, and well-rounded. Be detailed, factual, and supportive.
+Encourage learning and critical thinking. Be deep, meaningful, and accurate.
+Do not use LaTeX formatting for math (like \[ \] or \sqrt or anything starting with \). Use standard Unicode symbols (e.g. √, ×, ≈) and plain text for equations to ensure they render correctly on Telegram. Avoid using tables.`;
 
 // Content Prompts
-const PROMPT_INSPIRE = "Tell me a fascinating, lesser-known scientific fact or a chemistry trivia. Keep it concise and interesting.";
-const PROMPT_LOVE = "Write a short, elegant, and supportive note to Tina reminding her of Alireza's love and pride in her hard work.";
+const PROMPT_INSPIRE = "Tell me a fascinating, lesser-known scientific or interesting fact. Keep it concise and engaging.";
+const PROMPT_MOTIVATE = "Write a short, elegant, and motivational message to encourage productivity and positive thinking.";
 
 // Keyboards
 const KEYBOARDS = {
@@ -157,7 +157,42 @@ const GLOBAL_FALLBACK_ORDER = [
 
 // --- ROUTES ---
 
-app.get('/', (c) => c.text('Tina\'s Bot is alive!'));
+app.get('/', (c) => c.text('TG-ChatBot is alive! 🤖'));
+
+// Auto-setup webhook endpoint - call this after deployment
+app.get('/setup-webhook', async (c) => {
+    const env = c.env;
+    const workerUrl = new URL(c.req.url);
+    const webhookUrl = `${workerUrl.origin}/webhook`;
+
+    try {
+        const response = await fetch(
+            `https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/setWebhook?url=${webhookUrl}`
+        );
+        const result: any = await response.json();
+
+        if (result.ok) {
+            return c.json({
+                success: true,
+                message: 'Webhook configured successfully! ✅',
+                webhook_url: webhookUrl,
+                telegram_response: result
+            });
+        } else {
+            return c.json({
+                success: false,
+                message: 'Failed to set webhook',
+                error: result.description
+            }, 400);
+        }
+    } catch (error: any) {
+        return c.json({
+            success: false,
+            message: 'Error setting webhook',
+            error: error.message
+        }, 500);
+    }
+});
 
 app.post('/webhook', async (c) => {
     const update: TelegramUpdate = await c.req.json();
@@ -217,28 +252,31 @@ app.post('/webhook', async (c) => {
     const chatId = message.chat.id;
     const userId = message.from.id;
 
-    // 2. Authorization Check
-    const allowedIds = [env.GF_USER_ID, '153095113'];
-    if (!allowedIds.includes(userId.toString())) {
-        console.log(`Unauthorized access attempt from: ${userId}`);
-        await sendMessage(chatId, "Access Denied ⛔\nOnly Tina can use this bot.", env.TELEGRAM_TOKEN);
-        return c.json({ ok: true });
+    // 2. Authorization Check (configurable public/private)
+    if (env.ACCESS_MODE === 'private') {
+        const allowedIds = env.ALLOWED_USER_IDS.split(',').map(id => id.trim());
+        if (!allowedIds.includes(userId.toString())) {
+            console.log(`Unauthorized access attempt from: ${userId}`);
+            await sendMessage(chatId, "Access Denied ⛔\nYou are not authorized to use this bot.", env.TELEGRAM_TOKEN);
+            return c.json({ ok: true });
+        }
     }
+    // If ACCESS_MODE is "public", allow everyone
 
     // 3. Language Check
     const langKey = `lang:${userId}`;
-    let userLang = await env.TINA_BOT_KV.get(langKey) as 'en' | 'fa';
+    let userLang = await env.TG_BOT_KV.get(langKey) as 'en' | 'fa';
 
     // Handle Change Language
     if (text.includes('Change Language') || text.includes('تغییر زبان')) {
-        await env.TINA_BOT_KV.delete(langKey);
+        await env.TG_BOT_KV.delete(langKey);
         await sendMessage(chatId, "Please choose your language / لطفا زبان خود را انتخاب کنید:", env.TELEGRAM_TOKEN, KEYBOARDS.en.lang);
         return c.json({ ok: true });
     }
 
     // --- DETERMINE CURRENT MODEL (For Display & Usage) ---
     const usageKey = `usage:${userId}`;
-    const usageData = await env.TINA_BOT_KV.get(usageKey);
+    const usageData = await env.TG_BOT_KV.get(usageKey);
     const usage = usageData ? JSON.parse(usageData) : {};
     let activeModel = usage.manualModel || 'openai/gpt-oss-120b';
 
@@ -249,11 +287,11 @@ app.post('/webhook', async (c) => {
 
     if (!userLang) {
         if (text.includes('English')) {
-            await env.TINA_BOT_KV.put(langKey, 'en');
-            await sendMessage(chatId, "Language set to English! 🇬🇧\nHello Tina! I'm your assistant.", env.TELEGRAM_TOKEN, getMainKeyboard('en', activeModel));
+            await env.TG_BOT_KV.put(langKey, 'en');
+            await sendMessage(chatId, "Language set to English! 🇬🇧\nHello! I'm your AI assistant.", env.TELEGRAM_TOKEN, getMainKeyboard('en', activeModel));
         } else if (text.includes('Persian') || text.includes('فارسی')) {
-            await env.TINA_BOT_KV.put(langKey, 'fa');
-            await sendMessage(chatId, "زبان روی فارسی تنظیم شد! 🇮🇷\nسلام تینا! من دستیار شما هستم.", env.TELEGRAM_TOKEN, getMainKeyboard('fa', activeModel));
+            await env.TG_BOT_KV.put(langKey, 'fa');
+            await sendMessage(chatId, "زبان روی فارسی تنظیم شد! 🇮🇷\nسلام! من دستیار هوش مصنوعی شما هستم.", env.TELEGRAM_TOKEN, getMainKeyboard('fa', activeModel));
         } else {
             await sendMessage(chatId, "Please choose your language / لطفا زبان خود را انتخاب کنید:", env.TELEGRAM_TOKEN, KEYBOARDS.en.lang);
         }
@@ -321,7 +359,7 @@ app.post('/webhook', async (c) => {
 
     // 4. Command Handling (Only if text exists)
     if (text === '/start') {
-        const welcome = isPersian ? "خوش اومدی جیگر! 🧪\nچطور می‌توانم امروز به شما کمک کنم؟" : "Welcome back, Dr. Tina! 🧪\nHow can I help with your research today?";
+        const welcome = isPersian ? "خوش آمدید! 🤖\nچطور می‌توانم امروز به شما کمک کنم؟" : "Welcome! 🤖\nHow can I help you today?";
         await sendMessage(chatId, welcome, env.TELEGRAM_TOKEN, currentKeyboard);
         return c.json({ ok: true });
     }
@@ -339,7 +377,7 @@ app.post('/webhook', async (c) => {
 
         // Store explicit manual selection
         usage.manualModel = selectedModel;
-        await env.TINA_BOT_KV.put(usageKey, JSON.stringify(usage));
+        await env.TG_BOT_KV.put(usageKey, JSON.stringify(usage));
 
         // Re-generate keyboard with NEW model to show update immediately
         const newKeyboard = getMainKeyboard(userLang, selectedModel);
@@ -352,7 +390,7 @@ app.post('/webhook', async (c) => {
 
 
     if (text.includes('New Topic') || text.includes('موضوع جدید')) {
-        await env.TINA_BOT_KV.delete(`history:${userId}`);
+        await env.TG_BOT_KV.delete(`history:${userId}`);
         const clearMsg = isPersian ? "حافظه پاک شد. موضوع بعدی چیست؟ ✨" : "Context cleared. Ready for a new topic. ✨";
         await sendMessage(chatId, clearMsg, env.TELEGRAM_TOKEN, currentKeyboard);
         return c.json({ ok: true });
@@ -364,7 +402,7 @@ app.post('/webhook', async (c) => {
 
     // Load History
     const historyKey = `history:${userId}`;
-    const historyData = await env.TINA_BOT_KV.get(historyKey);
+    const historyData = await env.TG_BOT_KV.get(historyKey);
     if (historyData) {
         history = JSON.parse(historyData);
     }
@@ -372,7 +410,7 @@ app.post('/webhook', async (c) => {
     if (text.includes('Inspire Me') || text.includes('الهام بخش')) {
         promptToGemini = PROMPT_INSPIRE;
     } else if (text.includes('For You') || text.includes('برای تو')) {
-        promptToGemini = PROMPT_LOVE;
+        promptToGemini = PROMPT_MOTIVATE;
     } else {
         // Normal conversation
         if (!promptToGemini && mediaData) {
@@ -529,7 +567,7 @@ app.post('/webhook', async (c) => {
             if (!text.includes('Inspire Me') && !text.includes('For You') &&
                 !text.includes('الهام بخش') && !text.includes('برای تو')) {
                 history.push({ role: 'model', parts: [{ text: aiResponse }] });
-                await env.TINA_BOT_KV.put(historyKey, JSON.stringify(history));
+                await env.TG_BOT_KV.put(historyKey, JSON.stringify(history));
             }
         } else {
             // All models failed
@@ -899,91 +937,6 @@ async function callGemini(
     return data.candidates[0].content.parts[0].text;
 }
 
-// --- SCHEDULED HANDLER (Angel Numbers) ---
-const scheduled = async (event: any, env: Bindings, ctx: ExecutionContext) => {
-    // 1. Get Tehran Time (UTC + 3:30)
-    // Offset in milliseconds: 3.5 * 60 * 60 * 1000 = 12600000
-    const now = new Date();
-    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const tehranTime = new Date(utcTime + 12600000);
-
-    const hour = tehranTime.getHours();
-    const minute = tehranTime.getMinutes();
-
-    // 2. Exclusion Window (01:01 to 06:06 inclusive of start/end logic roughly)
-    // "from hour 01:01 till 06:06 it must be off"
-    // We can interpret this strict: if current time is >= 01:01 AND <= 06:06
-    if ((hour > 1 || (hour === 1 && minute >= 1)) && (hour < 6 || (hour === 6 && minute <= 6))) {
-        return;
-    }
-
-    // 3. Angel Number Check
-    let isAngelTime = false;
-    let messageContent = "";
-    let force100Percent = false;
-
-    // Case A: Hour == Minute (e.g. 11:11)
-    if (hour === minute) {
-        isAngelTime = true;
-        messageContent = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        if (hour === 0 && minute === 0) force100Percent = true;
-    }
-
-    // Case B: Sequence 12:34 (at 12:34 OR 00:34)
-    // "add 12:34 pm and 00:34 am ... both as 12:34 output"
-    else if ((hour === 12 && minute === 34) || (hour === 0 && minute === 34)) {
-        isAngelTime = true;
-        messageContent = "12:34";
-    }
-
-    if (isAngelTime) {
-        // 4. Probability Check
-        let shouldSend = false;
-
-        if (force100Percent) {
-            shouldSend = true; // 100% at 00:00
-        } else {
-            shouldSend = Math.random() < 0.5; // 50% otherwise
-        }
-
-        if (shouldSend) {
-            try {
-                // Broadcast to ALL users
-                // We track users via 'usage:{userId}' keys
-                const list = await env.TINA_BOT_KV.list({ prefix: 'usage:' });
-
-                // Also ensure Tina and Alireza get it if not in list (though they should be)
-                const targetIds = new Set<number>();
-                if (env.GF_USER_ID) targetIds.add(parseInt(env.GF_USER_ID));
-                targetIds.add(153095113); // Alireza
-
-                for (const key of list.keys) {
-                    const parts = key.name.split(':');
-                    if (parts.length === 2) {
-                        const uid = parseInt(parts[1]);
-                        if (!isNaN(uid)) targetIds.add(uid);
-                    }
-                }
-
-                console.log(`Broadcasting Angel Number ${messageContent} to ${targetIds.size} users.`);
-
-                for (const id of targetIds) {
-                    try {
-                        await sendMessage(id, messageContent, env.TELEGRAM_TOKEN);
-                    } catch (e) {
-                        console.error(`Failed to send to ${id}:`, e);
-                    }
-                }
-
-            } catch (e) {
-                console.error("Broadcast Error:", e);
-                // Fallback: Try sending to Tina at least
-                await sendMessage(parseInt(env.GF_USER_ID), messageContent, env.TELEGRAM_TOKEN);
-            }
-        }
-    }
-};
-
 // Helper Functions
 async function generateSpeechGoogle(text: string, lang: string): Promise<ArrayBuffer> {
     // Google TTS (Unofficial) - ONLY works with SHORT text (~200 chars max)
@@ -1007,6 +960,6 @@ async function generateSpeechGoogle(text: string, lang: string): Promise<ArrayBu
 }
 
 export default {
-    fetch: app.fetch,
-    scheduled
+    fetch: app.fetch
 };
+

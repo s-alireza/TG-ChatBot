@@ -1,0 +1,59 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  # Run on push to main branch
+  push:
+    branches:
+      - main
+  
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Bot
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate wrangler.toml
+        run: |
+          cat > wrangler.toml << EOF
+          name = "tg-chatbot"
+          compatibility_date = "2024-01-01"
+          account_id = "${{ secrets.CF_ACCOUNT_ID }}"
+          main = "src/index.ts"
+
+          [[kv_namespaces]]
+          binding = "TG_BOT_KV"
+          id = "${{ secrets.CF_KV_NAMESPACE_ID }}"
+
+          [vars]
+          TELEGRAM_TOKEN = "${{ secrets.TELEGRAM_TOKEN }}"
+          GEMINI_API_KEY = "${{ secrets.GEMINI_API_KEY }}"
+          GROQ_API_KEY = "${{ secrets.GROQ_API_KEY }}"
+          ACCESS_MODE = "${{ secrets.ACCESS_MODE }}"
+          ALLOWED_USER_IDS = "${{ secrets.ALLOWED_USER_IDS }}"
+          EOF
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+
+      - name: Set Webhook
+        run: |
+          echo "Setting up Telegram webhook..."
+          curl -s "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/setWebhook?url=https://tg-chatbot.${{ secrets.CF_ACCOUNT_ID }}.workers.dev/webhook" || true
+          echo "Webhook setup attempted. Visit your worker URL + /setup-webhook to confirm."
