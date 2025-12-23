@@ -1,5 +1,4 @@
 {
-    "$schema": "https://workers.cloudflare.com/schemas/deploy.json",
     "name": "TG-ChatBot",
     "description": "A free & fast AI chatbot for Telegram, powered by Llama, Gemini, and more",
     "icon": "🤖",
@@ -31,20 +30,8 @@
                 },
                 {
                     "name": "GEMINI_API_KEY",
-                    "description": "Google Gemini API Key (optional)",
+                    "description": "Google Gemini API Key (optional, leave empty to skip)",
                     "secret": true,
-                    "required": false
-                },
-                {
-                    "name": "ACCESS_MODE",
-                    "description": "Access mode: 'public' (anyone) or 'private' (whitelist)",
-                    "default": "public",
-                    "required": false
-                },
-                {
-                    "name": "ALLOWED_USER_IDS",
-                    "description": "Comma-separated Telegram User IDs (for private mode)",
-                    "default": "",
                     "required": false
                 }
             ]
