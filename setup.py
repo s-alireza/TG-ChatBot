@@ -358,7 +358,7 @@ class SetupApp:
                 self.log("\nStep 4: Deploying to Cloudflare Workers...")
                 
                 result = subprocess.run(
-                    ["npx", "wrangler", "deploy"],
+                    ["npx", "wrangler", "deploy", "-c", "wrangler.local.toml"],
                     cwd=project_dir,
                     capture_output=True,
                     text=True,
@@ -485,8 +485,8 @@ class SetupApp:
             self.log(f"❌ Failed to save .env: {e}")
             return False
         
-        # Generate wrangler.toml
-        wrangler_path = Path(__file__).parent / "wrangler.toml"
+        # Generate wrangler.local.toml (for local deployment with secrets)
+        wrangler_path = Path(__file__).parent / "wrangler.local.toml"
         try:
             wrangler_content = f'''name = "tg-chatbot"
 compatibility_date = "2024-01-01"

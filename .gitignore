@@ -14,7 +14,6 @@ __pycache__/
 .vscode/
 .idea/
 
-# Generated
-wrangler.toml
+# Generated/Local
+wrangler.local.toml
 dist
-.env

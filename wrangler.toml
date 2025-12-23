@@ -1,0 +1,15 @@
+name = "tg-chatbot"
+compatibility_date = "2024-01-01"
+main = "src/index.ts"
+
+# KV Namespace - created automatically by Deploy Button
+# [[kv_namespaces]]
+# binding = "TG_BOT_KV"
+# id = "your-kv-namespace-id"
+
+# Environment variables
+# TELEGRAM_TOKEN, GROQ_API_KEY, GEMINI_API_KEY should be set as secrets
+# in Cloudflare Dashboard, NOT hardcoded here
+[vars]
+ACCESS_MODE = "public"
+ALLOWED_USER_IDS = ""
