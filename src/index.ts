@@ -216,6 +216,7 @@ function getMainKeyboard(lang: string, currentModelId: string) {
 
     const brainText = `${brainLabel}: ${modelName}`;
 
+
     return {
         keyboard: [
             [{ text: conversationsText }],
@@ -231,7 +232,7 @@ function getSettingsKeyboard(lang: string) {
     if (lang === 'fa') {
         return {
             keyboard: [
-                [{ text: '🔑 کلیدهای API' }],
+                [{ text: '🔑 کلیدهای API' }, { text: 'ℹ️ درباره ربات' }],
                 [{ text: '🔙 بازگشت' }]
             ],
             resize_keyboard: true,
@@ -241,7 +242,7 @@ function getSettingsKeyboard(lang: string) {
         // Default English
         return {
             keyboard: [
-                [{ text: '🔑 API Keys' }],
+                [{ text: '🔑 API Keys' }, { text: 'ℹ️ Info' }],
                 [{ text: '🔙 Back' }]
             ],
             resize_keyboard: true,
@@ -250,12 +251,25 @@ function getSettingsKeyboard(lang: string) {
     }
 }
 
+function getBackKeyboard(lang: string) {
+    const isFa = lang === 'fa';
+    return {
+        keyboard: [
+            [{ text: isFa ? '🔙 بازگشت' : '🔙 Back' }]
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true
+    };
+}
+
 // Settings Handler
 async function handleSettings(chatId: number, userId: number, text: string, lang: string, env: Bindings) {
     const isFa = lang === 'fa';
     // Labels
-    const settingsParams = isFa ? ['⚙️ تنظیمات', '🔑 کلیدهای API', '🔙 بازگشت'] : ['⚙️ Settings', '🔑 API Keys', '🔙 Back'];
-    const [lblSettings, lblKeys, lblBack] = settingsParams;
+    const settingsParams = isFa
+        ? ['⚙️ تنظیمات', '🔑 کلیدهای API', '🔙 بازگشت', 'ℹ️ درباره ربات']
+        : ['⚙️ Settings', '🔑 API Keys', '🔙 Back', 'ℹ️ Info'];
+    const [lblSettings, lblKeys, lblBack, lblInfo] = settingsParams;
 
     // 1. Enter Settings Menu
     if (text === lblSettings) {
@@ -264,7 +278,18 @@ async function handleSettings(chatId: number, userId: number, text: string, lang
         return true;
     }
 
-    // 2. Back to Main
+    // 2. Info / About
+    if (text === lblInfo) {
+        const msg = isFa
+            ? "🤖 **درباره ربات**\n\nاین ربات با عشق و تلاش بسیار توسعه داده شده است.\n\n🌐 سورس کد پروژه در گیت‌هاب موجود است:\nhttps://github.com/s-alireza/TG-ChatBot\n\n⭐ اگر از این ربات راضی هستید، لطفاً در گیت‌هاب به ما ستاره بدهید!"
+            : "🤖 **About Bot**\n\nThis bot works with multiple AI models to assist you.\n\n🌐 Project Source Code:\nhttps://github.com/s-alireza/TG-ChatBot\n\n⭐ If you like this bot, please give us a star on GitHub!";
+
+        // Show info, keep user in Settings menu
+        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+        return true;
+    }
+
+    // 3. Back to Main
     if (text === lblBack) {
         const usageKey = `usage:${userId}`;
         const usageData = await env.TG_BOT_KV.get(usageKey);
@@ -285,8 +310,8 @@ async function handleSettings(chatId: number, userId: number, text: string, lang
             ? `🔑 *مدیریت کلیدهای API*\n\nوضعیت فعلی:\n• **Groq**: ${currentGroq}\n• **Gemini**: ${currentGemini}\n\nبرای تنظیم کلید جدید، آن را ارسال کنید:\n- \`gsk_...\` برای Groq\n- \`AI...\` برای Gemini\n\nبرای حذف کلید اختصاصی خود، بنویسید \`delete keys\`.`
             : `🔑 *API Key Management*\n\nCurrent Status:\n• **Groq**: ${currentGroq}\n• **Gemini**: ${currentGemini}\n\nTo set a key, just send it here:\n- \`gsk_...\` for Groq\n- \`AI...\` for Gemini\n\nTo remove your custom keys, type \`delete keys\`.`;
 
-        // FIXED: Added getSettingsKeyboard here so user sees the 'Back' button
-        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+        // FIXED: Use getBackKeyboard to show ONLY Back button
+        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getBackKeyboard(lang));
         return true;
     }
 
@@ -294,7 +319,8 @@ async function handleSettings(chatId: number, userId: number, text: string, lang
     if (text.startsWith('gsk_') && text.length > 20) {
         await env.TG_BOT_KV.put(`config:groq_key:${userId}`, text);
         const msg = isFa ? "✅ کلید Groq اختصاصی شما ذخیره شد!" : "✅ Your custom Groq API Key has been saved!";
-        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+        // Stay in API Keys menu -> show Back keyboard
+        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getBackKeyboard(lang));
         return true;
     }
 
@@ -302,7 +328,7 @@ async function handleSettings(chatId: number, userId: number, text: string, lang
         // Basic heuristic for Gemini keys (AIza...)
         await env.TG_BOT_KV.put(`config:gemini_key:${userId}`, text);
         const msg = isFa ? "✅ کلید Gemini اختصاصی شما ذخیره شد! مدل‌های جمنای باز شدند." : "✅ Your custom Gemini API Key has been saved! Gemini models unlocked.";
-        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getBackKeyboard(lang));
         return true;
     }
 
@@ -310,7 +336,7 @@ async function handleSettings(chatId: number, userId: number, text: string, lang
         await env.TG_BOT_KV.delete(`config:groq_key:${userId}`);
         await env.TG_BOT_KV.delete(`config:gemini_key:${userId}`);
         const msg = isFa ? "🗑️ کلیدهای اختصاصی شما حذف شدند. از کلیدهای پیش‌فرض سیستم (در صورت وجود) استفاده خواهد شد." : "🗑️ Custom keys deleted. Reverted to system defaults (if available).";
-        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+        await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getBackKeyboard(lang));
         return true;
     }
 
