@@ -2,7 +2,7 @@
 interface Env { }
 
 // Hardcoded source of truth for the worker code
-const CODE_URL = "https://raw.githubusercontent.com/s-alireza/TG-ChatBot/main/dist/worker.js";
+const CODE_URL = "https://raw.githubusercontent.com/s-alireza/TG-ChatBot/main/dist/index.js";
 
 export default {
     async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
