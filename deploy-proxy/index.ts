@@ -23,10 +23,10 @@ export default {
 
         try {
             const body = await request.json() as any;
-            const { telegram_token, groq_key, gemini_key, cf_token, access_mode, allowed_user_ids } = body;
+            const { telegram_token, cf_token, access_mode, allowed_user_ids } = body;
 
             // 1. Validation
-            if (!telegram_token || !groq_key || !cf_token) {
+            if (!telegram_token || !cf_token) {
                 throw new Error("Missing required API keys");
             }
 
@@ -49,8 +49,8 @@ export default {
             const deployResult = await deployWorker(cf_token, accountId, workerName, workerCode, {
                 TG_BOT_KV: kvId,
                 TELEGRAM_TOKEN: telegram_token,
-                GROQ_API_KEY: groq_key,
-                GEMINI_API_KEY: gemini_key || "",
+                GROQ_API_KEY: "", // Managed by bot
+                GEMINI_API_KEY: "", // Managed by bot
                 ACCESS_MODE: access_mode || "public",
                 ALLOWED_USER_IDS: allowed_user_ids || ""
             });

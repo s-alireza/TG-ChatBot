@@ -76,8 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleDeploy() {
         // 1. Get Values
         const telegramToken = document.getElementById('telegram_token').value.trim();
-        const groqKey = document.getElementById('groq_key').value.trim();
-        const geminiKey = document.getElementById('gemini_key').value.trim();
         const cfToken = document.getElementById('cf_api_token').value.trim();
         const accessMode = document.querySelector('input[name="access_mode"]:checked').value;
         const userIds = document.getElementById('allowed_user_ids').value.trim();
@@ -85,7 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 2. Validation
         if (!telegramToken) return showError("Telegram Bot Token is required");
-        if (!groqKey) return showError("Groq API Key is required");
         if (!cfToken) return showError("Cloudflare API Token is required");
         if (accessMode === 'private' && !userIds) return showError("User IDs are required for private mode");
 
@@ -104,8 +101,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const payload = {
             telegram_token: telegramToken,
-            groq_key: groqKey,
-            gemini_key: geminiKey,
             cf_token: cfToken,
             access_mode: accessMode,
             allowed_user_ids: userIds
