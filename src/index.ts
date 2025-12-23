@@ -173,20 +173,29 @@ const GLOBAL_FALLBACK_ORDER = [
 
 // --- SETUP WIZARD ---
 // Checks if bot is configured (has Groq API key)
-async function isConfigured(kv: KVNamespace): Promise<boolean> {
-    const groqKey = await kv.get('config:groq_key');
-    return !!groqKey;
+// Now checks User KV first, then Global KV/Env
+async function isConfigured(kv: KVNamespace, env: Bindings, userId: number): Promise<boolean> {
+    const userGroqKey = await kv.get(`config:groq_key:${userId}`);
+    if (userGroqKey) return true;
+
+    // Fallback to Global/Env
+    const globalGroqKey = await kv.get('config:groq_key');
+    return !!globalGroqKey || !!env.GROQ_API_KEY;
 }
 
-// Get API keys from KV (fallback to env)
-async function getGroqKey(kv: KVNamespace, env: Bindings): Promise<string | null> {
-    const kvKey = await kv.get('config:groq_key');
-    return kvKey || env.GROQ_API_KEY || null;
+// Get API keys from User KV -> Env
+async function getGroqKey(kv: KVNamespace, env: Bindings, userId: number): Promise<string | null> {
+    const userKey = await kv.get(`config:groq_key:${userId}`);
+    if (userKey) return userKey;
+    const globalKey = await kv.get('config:groq_key'); // Legacy/Global
+    return globalKey || env.GROQ_API_KEY || null;
 }
 
-async function getGeminiKey(kv: KVNamespace, env: Bindings): Promise<string | null> {
-    const kvKey = await kv.get('config:gemini_key');
-    return kvKey || env.GEMINI_API_KEY || null;
+async function getGeminiKey(kv: KVNamespace, env: Bindings, userId: number): Promise<string | null> {
+    const userKey = await kv.get(`config:gemini_key:${userId}`);
+    if (userKey) return userKey;
+    const globalKey = await kv.get('config:gemini_key'); // Legacy/Global
+    return globalKey || env.GEMINI_API_KEY || null;
 }
 
 // Setup steps: 0 = asking for Groq key, 1 = asking for Gemini key
@@ -199,7 +208,7 @@ async function handleSetupWizard(
     const kv = env.TG_BOT_KV;
 
     // Check if already configured
-    if (await isConfigured(kv)) {
+    if (await isConfigured(kv, env, userId)) {
         return { handled: false };
     }
 
@@ -527,8 +536,8 @@ app.post('/webhook', async (c) => {
     }
 
     // 3. Get API keys from KV (with env fallback)
-    const groqApiKey = await getGroqKey(env.TG_BOT_KV, env);
-    const geminiApiKey = await getGeminiKey(env.TG_BOT_KV, env);
+    const groqApiKey = await getGroqKey(env.TG_BOT_KV, env, userId);
+    const geminiApiKey = await getGeminiKey(env.TG_BOT_KV, env, userId);
 
     // If still no Groq key, something went wrong
     if (!groqApiKey) {
@@ -596,6 +605,11 @@ app.post('/webhook', async (c) => {
     const langKey = `lang:${userId}`;
     let userLang = await env.TG_BOT_KV.get(langKey);
 
+    // --- SETTINGS & CONFIGURATION ---
+    if (await handleSettings(chatId, userId, text, userLang || 'en', env)) {
+        return c.json({ ok: true });
+    }
+
     // Handle Change Language
     if (text.includes('Change Language') || text.includes('تغییر زبان') || text.includes('Сменить язык') || text.includes('更改语言') || text.includes('تغيير اللغة') || text.includes('Cambiar Idioma')) {
         await env.TG_BOT_KV.delete(langKey);
@@ -610,8 +624,9 @@ app.post('/webhook', async (c) => {
     let activeModel = usage.manualModel || 'openai/gpt-oss-120b';
 
     // Force Llama 3.3 for Voice to support Farsi/Smart replies
+    let processingModel = activeModel;
     if (isVoiceMessage) {
-        activeModel = 'llama-3.3-70b-versatile';
+        processingModel = 'llama-3.3-70b-versatile';
     }
 
     if (!userLang) {
@@ -665,27 +680,33 @@ app.post('/webhook', async (c) => {
         let conversationsText = '✨ New Conversation';
         let brainLabel = '🧠 Brain';
         let langLabel = '🌐 Change Language';
+        let settingsLabel = '⚙️ Settings';
 
         if (lang === 'fa') {
             conversationsText = '✨ گفتگوی جدید';
             brainLabel = '🧠 مدل';
             langLabel = '🌐 تغییر زبان';
+            settingsLabel = '⚙️ تنظیمات';
         } else if (lang === 'ru') {
             conversationsText = '✨ Новый чат';
             brainLabel = '🧠 Модель';
             langLabel = '🌐 Сменить язык';
+            settingsLabel = '⚙️ Настройки';
         } else if (lang === 'zh') {
             conversationsText = '✨ 新对话';
             brainLabel = '🧠 模型';
             langLabel = '🌐 更改语言';
+            settingsLabel = '⚙️ 设置';
         } else if (lang === 'ar') {
             conversationsText = '✨ محادثة جديدة';
             brainLabel = '🧠 نموذج';
             langLabel = '🌐 تغيير اللغة';
+            settingsLabel = '⚙️ الإعدادات';
         } else if (lang === 'es') {
-            conversationsText = '✨ Nueva Conversación';
+            conversationsText = '✨ Nueva conversación';
             brainLabel = '🧠 Cerebro';
             langLabel = '🌐 Cambiar Idioma';
+            settingsLabel = '⚙️ Configuración';
         }
 
         const brainText = `${brainLabel}: ${modelName}`;
@@ -693,16 +714,109 @@ app.post('/webhook', async (c) => {
         return {
             keyboard: [
                 [{ text: conversationsText }],
-                [{ text: brainText }, { text: langLabel }]
+                [{ text: brainText }],
+                [{ text: settingsLabel }, { text: langLabel }]
             ],
             resize_keyboard: true,
             persistent_keyboard: true,
         };
     }
 
+    function getSettingsKeyboard(lang: string) {
+        if (lang === 'fa') {
+            return {
+                keyboard: [
+                    [{ text: '🔑 کلیدهای API' }],
+                    [{ text: '🔙 بازگشت' }]
+                ],
+                resize_keyboard: true,
+                one_time_keyboard: true
+            };
+        } else {
+            // Default English
+            return {
+                keyboard: [
+                    [{ text: '🔑 API Keys' }],
+                    [{ text: '🔙 Back' }]
+                ],
+                resize_keyboard: true,
+                one_time_keyboard: true
+            };
+        }
+    }
+
+    // Settings Handler
+    async function handleSettings(chatId: number, userId: number, text: string, lang: string, env: Bindings) {
+        const isFa = lang === 'fa';
+        // Labels
+        const settingsParams = isFa ? ['⚙️ تنظیمات', '🔑 کلیدهای API', '🔙 بازگشت'] : ['⚙️ Settings', '🔑 API Keys', '🔙 Back'];
+        const [lblSettings, lblKeys, lblBack] = settingsParams;
+
+        // 1. Enter Settings Menu
+        if (text === lblSettings) {
+            const msg = isFa ? "⚙️ منوی تنظیمات:" : "⚙️ Settings Menu:";
+            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+            return true;
+        }
+
+        // 2. Back to Main
+        if (text === lblBack) {
+            const usageKey = `usage:${userId}`;
+            const usageData = await env.TG_BOT_KV.get(usageKey);
+            const usage = usageData ? JSON.parse(usageData) : {};
+            const activeModel = usage.manualModel || 'openai/gpt-oss-120b';
+
+            const msg = isFa ? "بازگشت به منوی اصلی." : "Back to main menu.";
+            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getMainKeyboard(lang, activeModel));
+            return true;
+        }
+
+        // 3. API Keys Menu
+        if (text === lblKeys) {
+            const currentGroq = await env.TG_BOT_KV.get(`config:groq_key:${userId}`) ? '✅ Custom Set' : '🌍 Default';
+            const currentGemini = await env.TG_BOT_KV.get(`config:gemini_key:${userId}`) ? '✅ Custom Set' : (env.GEMINI_API_KEY ? '🌍 System Default' : '❌ Not Set');
+
+            const msg = isFa
+                ? `🔑 *مدیریت کلیدهای API*\n\nوضعیت فعلی:\n• **Groq**: ${currentGroq}\n• **Gemini**: ${currentGemini}\n\nبرای تنظیم کلید جدید، آن را ارسال کنید:\n- \`gsk_...\` برای Groq\n- \`AI...\` برای Gemini\n\nبرای حذف کلید اختصاصی خود، بنویسید \`delete keys\`.`
+                : `🔑 *API Key Management*\n\nCurrent Status:\n• **Groq**: ${currentGroq}\n• **Gemini**: ${currentGemini}\n\nTo set a key, just send it here:\n- \`gsk_...\` for Groq\n- \`AI...\` for Gemini\n\nTo remove your custom keys, type \`delete keys\`.`;
+
+            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN);
+            return true;
+        }
+
+        // 4. Handle Key Inputs (Heuristic detection)
+        if (text.startsWith('gsk_') && text.length > 20) {
+            await env.TG_BOT_KV.put(`config:groq_key:${userId}`, text);
+            const msg = isFa ? "✅ کلید Groq اختصاصی شما ذخیره شد!" : "✅ Your custom Groq API Key has been saved!";
+            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+            return true;
+        }
+
+        if (text.startsWith('AI') && text.length > 20 && !text.includes(' ')) {
+            // Basic heuristic for Gemini keys (AIza...)
+            await env.TG_BOT_KV.put(`config:gemini_key:${userId}`, text);
+            const msg = isFa ? "✅ کلید Gemini اختصاصی شما ذخیره شد! مدل‌های جمنای باز شدند." : "✅ Your custom Gemini API Key has been saved! Gemini models unlocked.";
+            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+            return true;
+        }
+
+        if (text.toLowerCase() === 'delete keys') {
+            await env.TG_BOT_KV.delete(`config:groq_key:${userId}`);
+            await env.TG_BOT_KV.delete(`config:gemini_key:${userId}`);
+            const msg = isFa ? "🗑️ کلیدهای اختصاصی شما حذف شدند. از کلیدهای پیش‌فرض سیستم (در صورت وجود) استفاده خواهد شد." : "🗑️ Custom keys deleted. Reverted to system defaults (if available).";
+            await sendMessage(chatId, msg, env.TELEGRAM_TOKEN, getSettingsKeyboard(lang));
+            return true;
+        }
+
+        return false;
+    }
+
     // Generate Dynamic Keyboard
     const isPersian = userLang === 'fa';
-    const hasGeminiKey = !!geminiApiKey;
+    // Check if user has a custom Gemini key OR a system-wide one
+    const userGeminiKey = await env.TG_BOT_KV.get(`config:gemini_key:${userId}`);
+    const hasGeminiKey = !!userGeminiKey || !!env.GEMINI_API_KEY;
+
     const currentKeyboard = getMainKeyboard(userLang, activeModel);
     const modelKeyboard = getModelKeyboard(userLang, hasGeminiKey);
 
@@ -816,7 +930,7 @@ To use Gemini models, you need to add your GEMINI_API_KEY in the settings first.
     }
     history.push({ role: 'user', parts: [{ text: promptToGemini }] });
 
-    let initialModel = activeModel;
+    let initialModel = processingModel;
 
     let aiResponse = "";
     let success = false;
@@ -935,10 +1049,10 @@ To use Gemini models, you need to add your GEMINI_API_KEY in the settings first.
 
                         // Try to regenerate with current model
                         try {
-                            if (activeModel.startsWith('gemini') || activeModel.startsWith('gemma')) {
-                                shortResponse = await callGemini(geminiApiKey || '', shortPrompt, [], text, activeModel, null);
+                            if (processingModel.startsWith('gemini') || processingModel.startsWith('gemma')) {
+                                shortResponse = await callGemini(geminiApiKey || '', shortPrompt, [], text, processingModel, null);
                             } else {
-                                shortResponse = await callGroq(groqApiKey, shortPrompt, [], text, activeModel);
+                                shortResponse = await callGroq(groqApiKey, shortPrompt, [], text, processingModel);
                             }
                         } catch (regenError) {
                             console.error("Regeneration failed, using truncated response:", regenError);
