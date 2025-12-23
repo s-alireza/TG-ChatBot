@@ -309,7 +309,7 @@ app.post('/webhook', async (c) => {
 
     if (isVoiceMessage) {
         // Voice Mode: English only, ~1 minute speech (750 chars for Groq TTS).
-        localizedSystemPrompt += " Respond in English only. Keep your response conversational and under 750 characters.";
+        localizedSystemPrompt += " Respond in English ONLY. Keep your response conversational and under 750 characters.";
     } else {
         // Text Mode: General Conciseness (Fit in one Telegram message ~4096 chars)
         localizedSystemPrompt += " Keep your response concise and under 4000 characters to fit in a single message.";
@@ -996,8 +996,6 @@ async function generateSpeechGoogle(text: string, lang: string): Promise<ArrayBu
     // googleapis.com + gtx works for short English text
     const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=${lang}&q=${encodeURIComponent(safeText)}`;
 
-    console.log(`Google TTS Request (${lang}, ${safeText.length} chars)`);
-
     const resp = await fetch(url, {
         headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
@@ -1006,89 +1004,6 @@ async function generateSpeechGoogle(text: string, lang: string): Promise<ArrayBu
 
     if (!resp.ok) throw new Error(`Google TTS failed: ${resp.status}`);
     return await resp.arrayBuffer();
-}
-
-async function generateSpeechEdge(text: string, voice: string): Promise<ArrayBuffer> {
-    const requestId = crypto.randomUUID().replace(/-/g, '');
-    const url = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=${requestId}`;
-
-    return new Promise((resolve, reject) => {
-        const ws = new WebSocket(url);
-        const audioChunks: Uint8Array[] = [];
-        let lastReceivedText = "";
-
-        // Standard HTTP Date format (required by some Microsoft APIs)
-        const timestamp = new Date().toUTCString();
-
-        ws.addEventListener('open', () => {
-            console.log("EdgeTTS: Connected", { textLen: text.length });
-            // Reverted to 24khz as 16khz caused 1007 errors
-            const configMsg = `X-Timestamp:${timestamp}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n`;
-            ws.send(configMsg);
-
-            // Using Delay to prevent race condition
-            const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'><voice name='${voice}'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>${text}</prosody></voice></speak>`;
-            const ssmlMsg = `X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${timestamp}\r\nPath:ssml\r\n\r\n${ssml}`;
-
-            setTimeout(() => {
-                ws.send(ssmlMsg);
-            }, 250);
-        });
-
-        ws.addEventListener('message', async (event: any) => {
-            const data = event.data;
-            if (typeof data === 'string') {
-                lastReceivedText = data;
-                console.log("EdgeTTS Msg:", data);
-                if (data.includes('Path:turn.end')) {
-                    ws.close();
-                }
-            } else if (data instanceof ArrayBuffer || data instanceof Blob) {
-                let buffer: ArrayBuffer;
-                if (data instanceof Blob) {
-                    buffer = await data.arrayBuffer();
-                } else {
-                    buffer = data as ArrayBuffer;
-                }
-                const view = new Uint8Array(buffer);
-                let headerEnd = -1;
-                for (let i = 0; i < view.length - 3; i++) {
-                    if (view[i] === 13 && view[i + 1] === 10 && view[i + 2] === 13 && view[i + 3] === 10) {
-                        headerEnd = i + 3;
-                        break;
-                    }
-                }
-                if (headerEnd !== -1) {
-                    const headerBytes = view.slice(0, headerEnd);
-                    const headerStr = new TextDecoder().decode(headerBytes);
-                    if (headerStr.includes('Path:audio')) {
-                        audioChunks.push(view.slice(headerEnd + 1));
-                    }
-                }
-            }
-        });
-
-        ws.addEventListener('close', (event: any) => {
-            console.log(`EdgeTTS Closed: ${event.code} ${event.reason}`);
-            const totalLen = audioChunks.reduce((acc, chunk) => acc + chunk.length, 0);
-            if (totalLen > 0) {
-                const completeAudio = new Uint8Array(totalLen);
-                let offset = 0;
-                for (const chunk of audioChunks) {
-                    completeAudio.set(chunk, offset);
-                    offset += chunk.length;
-                }
-                resolve(completeAudio.buffer);
-            } else {
-                reject(new Error(`No audio received from Edge TTS. Code: ${event.code}. Last Msg: ${lastReceivedText.substring(0, 200)}`));
-            }
-        });
-
-        ws.addEventListener('error', (e: any) => {
-            console.error("EdgeTTS Error:", e);
-            reject(new Error("WebSocket Error: " + (e.message || "Unknown")));
-        });
-    });
 }
 
 export default {
