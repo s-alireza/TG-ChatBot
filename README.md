@@ -29,9 +29,8 @@ Click the button above to deploy your own bot in minutes! You'll need:
 
 ### After Deployment
 
-1. Copy your worker URL (e.g., `https://tg-chatbot.your-name.workers.dev`)
-2. Visit `https://your-worker-url/setup-webhook` to activate the bot
-3. Message your bot on Telegram - it's ready!
+1. **Click your worker URL** (shown after deployment, e.g., `https://tg-chatbot.your-name.workers.dev`)
+2. ✅ Webhook is set automatically! Message your bot on Telegram 🎉
 
 ---
 

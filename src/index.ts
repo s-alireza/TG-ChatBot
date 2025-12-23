@@ -157,9 +157,167 @@ const GLOBAL_FALLBACK_ORDER = [
 
 // --- ROUTES ---
 
-app.get('/', (c) => c.text('TG-ChatBot is alive! 🤖'));
+// Welcome page with auto-setup
+app.get('/', async (c) => {
+    const env = c.env;
+    const workerUrl = new URL(c.req.url);
+    const webhookUrl = `${workerUrl.origin}/webhook`;
 
-// Auto-setup webhook endpoint - call this after deployment
+    // Cache the worker URL for the scheduled handler
+    await env.TG_BOT_KV.put('worker_url', workerUrl.origin);
+
+    // Check current webhook status
+    let webhookStatus = { set: false, url: '', error: '' };
+    try {
+        const infoResponse = await fetch(
+            `https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/getWebhookInfo`
+        );
+        const info: any = await infoResponse.json();
+
+        if (info.ok && info.result.url) {
+            webhookStatus.set = true;
+            webhookStatus.url = info.result.url;
+        }
+    } catch (e: any) {
+        webhookStatus.error = e.message;
+    }
+
+    // Auto-setup webhook if not set
+    let setupResult = { attempted: false, success: false, message: '' };
+    if (!webhookStatus.set && !webhookStatus.error) {
+        setupResult.attempted = true;
+        try {
+            const response = await fetch(
+                `https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/setWebhook?url=${webhookUrl}`
+            );
+            const result: any = await response.json();
+
+            if (result.ok) {
+                setupResult.success = true;
+                setupResult.message = 'Webhook configured automatically!';
+                webhookStatus.set = true;
+                webhookStatus.url = webhookUrl;
+            } else {
+                setupResult.message = result.description || 'Failed to set webhook';
+            }
+        } catch (e: any) {
+            setupResult.message = e.message;
+        }
+    }
+
+    // Return beautiful HTML status page
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+    <title>TG-ChatBot Status</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eaeaea;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            max-width: 500px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .emoji { font-size: 64px; margin-bottom: 20px; }
+        h1 { margin: 0 0 10px 0; color: #e94560; }
+        .status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .status.online { background: #00d26a; color: #000; }
+        .status.offline { background: #e94560; color: #fff; }
+        .info {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+            font-size: 14px;
+        }
+        .info-row { margin: 8px 0; }
+        .info-label { color: #888; }
+        code {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        .btn {
+            display: inline-block;
+            background: #e94560;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .btn:hover { background: #ff6b6b; }
+        .success-msg { color: #00d26a; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="emoji">🤖</div>
+        <h1>TG-ChatBot</h1>
+        <p>Your AI-powered Telegram bot</p>
+        
+        <div class="status ${webhookStatus.set ? 'online' : 'offline'}">
+            ${webhookStatus.set ? '✅ Online & Ready' : '⚠️ Webhook Not Set'}
+        </div>
+        
+        ${setupResult.attempted && setupResult.success ? `
+            <p class="success-msg">🎉 ${setupResult.message}</p>
+        ` : ''}
+        
+        <div class="info">
+            <div class="info-row">
+                <span class="info-label">Worker URL:</span><br>
+                <code>${workerUrl.origin}</code>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Webhook:</span><br>
+                <code>${webhookStatus.url || 'Not configured'}</code>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Access Mode:</span>
+                <code>${env.ACCESS_MODE || 'public'}</code>
+            </div>
+        </div>
+        
+        ${webhookStatus.set ? `
+            <p>Your bot is ready! Send a message on Telegram to test it.</p>
+        ` : `
+            <a href="/setup-webhook" class="btn">🔧 Setup Webhook</a>
+        `}
+    </div>
+</body>
+</html>`;
+
+    return c.html(html);
+});
+
+// Manual webhook setup endpoint (backup)
 app.get('/setup-webhook', async (c) => {
     const env = c.env;
     const workerUrl = new URL(c.req.url);
@@ -172,12 +330,8 @@ app.get('/setup-webhook', async (c) => {
         const result: any = await response.json();
 
         if (result.ok) {
-            return c.json({
-                success: true,
-                message: 'Webhook configured successfully! ✅',
-                webhook_url: webhookUrl,
-                telegram_response: result
-            });
+            // Redirect to home page to show success
+            return c.redirect('/');
         } else {
             return c.json({
                 success: false,
@@ -962,4 +1116,3 @@ async function generateSpeechGoogle(text: string, lang: string): Promise<ArrayBu
 export default {
     fetch: app.fetch
 };
-
