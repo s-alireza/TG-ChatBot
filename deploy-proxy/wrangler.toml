@@ -1,0 +1,8 @@
+name = "tg-bot-deploy-proxy"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+
+[cors]
+origins = ["*"]
+methods = ["POST", "GET", "OPTIONS"]
+max_age = 86400

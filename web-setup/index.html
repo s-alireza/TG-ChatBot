@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TG-ChatBot Setup & Deploy</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <h1>🤖 TG-ChatBot Setup</h1>
+            <p class="subtitle">Enter your API keys and deploy your bot in seconds</p>
+        </header>
+
+        <!-- Main Form -->
+        <main>
+            <!-- API Keys Section -->
+            <section class="card">
+                <h2>🔑 API Keys</h2>
+                
+                <div class="input-group">
+                    <label for="telegram_token">Telegram Bot Token</label>
+                    <input type="password" id="telegram_token" placeholder="From @BotFather" autocomplete="off">
+                    <small>Get this from <a href="https://t.me/BotFather" target="_blank">@BotFather</a> on Telegram</small>
+                </div>
+
+                <div class="input-group">
+                    <label for="groq_key">Groq API Key</label>
+                    <input type="password" id="groq_key" placeholder="gsk_..." autocomplete="off">
+                    <small>Get free key at <a href="https://console.groq.com/keys" target="_blank">console.groq.com</a></small>
+                </div>
+
+                <div class="input-group">
+                    <label for="gemini_key">Gemini API Key <span class="optional">(Optional)</span></label>
+                    <input type="password" id="gemini_key" placeholder="AIza..." autocomplete="off">
+                    <small>Get key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a></small>
+                </div>
+            </section>
+
+            <!-- Cloudflare Section -->
+            <section class="card">
+                <h2>☁️ Cloudflare Configuration</h2>
+                
+                <div class="input-group">
+                    <label for="cf_api_token">Cloudflare API Token</label>
+                    <input type="password" id="cf_api_token" placeholder="Look for 'Edit Cloudflare Workers' template" autocomplete="off">
+                    <small>Create at <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank">User Profile > API Tokens</a>. Use "Edit Cloudflare Workers" template.</small>
+                </div>
+            </section>
+
+            <!-- Access Control Section -->
+            <section class="card">
+                <h2>🔒 Access Control</h2>
+                
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="access_mode" value="public" checked>
+                        <span class="radio-label">
+                            <span class="emoji">🌍</span>
+                            <span>Public User</span>
+                            <span class="hint">Anyone can use the bot</span>
+                        </span>
+                    </label>
+                    
+                    <label class="radio-option">
+                        <input type="radio" name="access_mode" value="private">
+                        <span class="radio-label">
+                            <span class="emoji">🔒</span>
+                            <span>Private (Whitelist)</span>
+                            <span class="hint">Only specific user IDs</span>
+                        </span>
+                    </label>
+                </div>
+
+                <div id="user_ids_container" class="input-group hidden">
+                    <label for="allowed_user_ids">Allowed User IDs (comma-separated)</label>
+                    <input type="text" id="allowed_user_ids" placeholder="e.g. 123456789, 987654321">
+                    <small>Check your ID via <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a></small>
+                </div>
+            </section>
+
+            <!-- Advanced / Proxy Settings -->
+            <details class="advanced-settings">
+                <summary>⚙️ Advanced: Proxy Settings</summary>
+                <div class="input-group">
+                    <label for="proxy_url">Deployment Proxy URL</label>
+                    <input type="text" id="proxy_url" placeholder="https://deploy-proxy.your-subdomain.workers.dev">
+                    <small>The worker that handles the deployment. Leave empty to use the default shared proxy.</small>
+                </div>
+            </details>
+
+            <!-- Deploy Button -->
+            <div class="action-area">
+                <button id="deploy_btn" class="deploy-btn">
+                    <span class="btn-text">🚀 Deploy to Cloudflare</span>
+                    <span class="loader hidden"></span>
+                </button>
+                <div id="status_message" class="status-msg"></div>
+            </div>
+
+            <!-- Logs -->
+            <div class="logs-container">
+                <div class="logs-header" id="toggle_logs">
+                    <span>📋 Deployment Logs</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="logs-content hidden" id="logs_output"></div>
+            </div>
+        </main>
+        
+        <footer>
+            <p>Created with ❤️ for TG-ChatBot</p>
+        </footer>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

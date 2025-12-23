@@ -2,7 +2,15 @@
 
 A free & fast personal AI chatbot for Telegram, powered by multiple AI models including Gemini, Llama, and more.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/s-alireza/TG-ChatBot)
+## 🚀 **Easiest Way to Deploy: Web Setup Tool**
+
+Start your bot in seconds using our free web-based setup tool (no installation required!):
+
+### 👉 [Open Web Setup Tool](https://s-alireza.github.io/TG-ChatBot/) 👈
+
+*(If the link doesn't work, see the "One-Time Setup" section below)*
+
+---
 
 ## Features
 
@@ -15,102 +23,63 @@ A free & fast personal AI chatbot for Telegram, powered by multiple AI models in
 
 ---
 
-## 🚀 One-Click Deploy
+## �️ Repository Owner Setup (One-Time)
 
-Click the button above to deploy your own bot in minutes!
+If you have forked this repository, you need to set up the **Web Tool** once so it works for you and others.
 
-### What You Need
+### 1. Enable GitHub Pages
 
-| Requirement | Where to Get |
-| --- | --- |
-| Telegram Bot Token | Message [@BotFather](https://t.me/BotFather) on Telegram |
-| Groq API Key | [console.groq.com/keys](https://console.groq.com/keys) |
-| Gemini API Key (optional) | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
-| GitHub/GitLab Account | To store your cloned repo |
-| Cloudflare Account | Free tier works! |
+1. Go to your repository **Settings** → **Pages**.
+2. Under **Build and deployment**, select **Source** as `GitHub Actions`.
+3. The `Deploy Web Setup to Pages` workflow will automatically handle the rest!
 
-### Setup Steps
+### 2. Deploy the Proxy Worker
 
-1. **Click the Deploy button** and enter your **Telegram Bot Token**
-2. After deployment, **click your worker URL** (e.g., `https://tg-chatbot.your-name.workers.dev`)
-3. ✅ Webhook is set automatically!
-4. **Message your bot on Telegram** - it will guide you to set up your API keys securely!
+The web tool needs a "proxy" to talk to Cloudflare. Deploy it once:
 
-> 💡 **Why this way?** Your API keys are entered directly in Telegram and stored securely. They're never exposed in public repositories or deploy forms!
+```bash
+cd deploy-proxy
+npx wrangler deploy
+```
+
+ > **Important**: Copy the **Worker URL** (e.g., `https://tg-bot-deploy-proxy.your-name.workers.dev`) and update `web-setup/script.js` line 14:
+>
+ > ```javascript
+ > const DEFAULT_PROXY_URL = 'https://tg-bot-deploy-proxy.your-name.workers.dev';
+ > ```
+
+### 3. Commit the Built Worker
+
+To allow the web tool to fetch your code, build and commit the worker file:
+
+```bash
+# In the root directory
+npx wrangler deploy --dry-run --outdir dist
+git add dist/worker.js
+git commit -m "Add built worker"
+git push
+```
 
 ---
 
 ## 💻 Manual Setup (Alternative)
 
-If you prefer to deploy manually:
+If you prefer to deploy manually using Python:
 
-### Prerequisites
-
-- Python 3.8+ (for setup tool)
-- Node.js 18+ (for Wrangler)
-
-### Steps
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/s-alireza/TG-ChatBot.git
-   cd TG-ChatBot
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-3. Run the setup tool:
-
-   ```bash
-   python setup.py
-   ```
-
-4. Enter your API keys and click **Deploy**!
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Run the setup tool: `python setup.py`
 
 ---
 
 ## 🔐 Getting a Cloudflare API Token
 
-For manual deployment, you need a Cloudflare API Token:
+For deployment, you need a Cloudflare API Token:
 
 1. Go to [dash.cloudflare.com](https://dash.cloudflare.com)
 2. Click profile icon → **My Profile** → **API Tokens**
-3. Click **Create Token**
-4. Use **"Edit Cloudflare Workers"** template
-5. Ensure these permissions:
-
-   | Permission | Access Level |
-   | --- | --- |
-   | Account - Workers KV Storage | Edit |
-   | Account - Workers Scripts | Edit |
-
-6. Create and copy your token
-
----
-
-## 🎮 Bot Commands
-
-| Button | Action |
-| --- | --- |
-| ✨ New Topic | Clear conversation history |
-| 💡 Inspire Me | Get a random interesting fact |
-| 💌 For You | Get a motivational message |
-| 🧠 Brain | Switch AI model |
-| 🌐 Language | Toggle English/Persian |
-
-## 🤖 Available AI Models
-
-- **Llama 4 Scout (17B)** - Meta's latest model
-- **Llama 3.3 (70B)** - Versatile for general tasks
-- **Llama 3.2 Vision** - For image analysis
-- **Qwen 3 (32B)** - Alibaba's multilingual model
-- **Gemini 2.5/3.0** - Google's models
-- **Compound AI** - Groq's compound system
+3. Create Token → **"Edit Cloudflare Workers"** template
+4. Create and copy your token
 
 ---
 
