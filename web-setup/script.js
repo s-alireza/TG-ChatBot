@@ -128,17 +128,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (result.success) {
                 log("Cloudflare account detected.", "success");
                 log("KV Namespace configured.", "success");
-                log("Worker code deployed successfully.", "success");
+                log("Worker code deployed.", "success");
 
-                if (result.webhook_set) {
-                    log("Telegram webhook set automatically.", "success");
+                const workerUrl = result.workerUrl;
+                log(`Worker URL: ${workerUrl}`, "info");
+
+                // Client-side verification (Avoids proxy timeout)
+                log("⏳ Waiting for DNS propagation (this checks the webhook)...", "step");
+                const isReady = await waitForWorker(workerUrl);
+
+                if (isReady) {
+                    log("✅ Webhook set successfully!", "success");
+                    log("🎉 Deployment Complete! Your bot is live.", "success");
+                    setStatus("✅ Deployment Successful!", "success");
                 } else {
-                    log("⚠️ Webhook could not be set automatically. Check worker logs.", "info");
+                    log("⚠️ Verification timed out. Please check the URL manually in 1-2 minutes.", "info");
+                    setStatus("⚠️ Deployment Complete (Propagation Delayed)", "success");
                 }
-
-                log(`Worker URL: ${result.worker_url}`, "info");
-                log("🎉 Deployment Complete! Your bot is live.", "success");
-                setStatus("✅ Deployment Successful!", "success");
             } else {
                 throw new Error(result.error || "Unknown deployment failure");
             }
@@ -173,5 +179,24 @@ document.addEventListener('DOMContentLoaded', () => {
         deployBtn.disabled = false;
         deployBtn.querySelector('.btn-text').textContent = "🚀 Deploy to Cloudflare";
         deployBtn.querySelector('.loader').classList.add('hidden');
+    }
+
+    async function waitForWorker(url) {
+        const maxRetries = 30; // 3 minutes (assuming 6s delay)
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                // We fetch the root URL. If it returns 200 (HTML), the worker is running.
+                const res = await fetch(url);
+                if (res.ok) {
+                    return true;
+                }
+            } catch (e) {
+                // Fetch failed (DNS not ready)
+            }
+            await new Promise(r => setTimeout(r, 6000));
+            // Update log only every 5th try to avoid spam? No, user needs feedback.
+            if (i % 2 === 0) log(`Pinging worker... (${i + 1}/${maxRetries})`, "info");
+        }
+        return false;
     }
 });

@@ -72,18 +72,8 @@ export default {
             const subdomain = await getSubdomain(cf_token, accountId);
             const workerUrl = `https://${workerName}.${subdomain}.workers.dev`;
 
-            // Wait 5s for propagation
-            await new Promise(r => setTimeout(r, 5000));
-
-            let webhookStatus = "⚠️ Webhook could not be set automatically. Check worker logs.";
-            try {
-                const ping = await fetch(workerUrl);
-                if (ping.ok) {
-                    webhookStatus = "✅ Webhook set successfully!";
-                }
-            } catch (e) {
-                console.log("Webhook ping failed:", e);
-            }
+            // 7. Return Success (Client will trigger webhook)
+            const webhookStatus = "⏳ Pending (Checking...)";
 
             return new Response(JSON.stringify({
                 success: true,
