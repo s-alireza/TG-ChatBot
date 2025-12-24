@@ -1,28 +1,27 @@
 {
-    "name": "TG-ChatBot",
-    "description": "A free & fast AI chatbot for Telegram, powered by Llama, Gemini, and more",
-    "icon": "🤖",
-    "deploy": {
-        "worker": {
-            "name": "tg-chatbot",
-            "main": "src/index.ts",
-            "compatibility_date": "2024-01-01"
+    "name": "tg-chatbot",
+    "main": "src/index.ts",
+    "compatibility_date": "2024-01-01",
+    "vars": {
+        "TELEGRAM_TOKEN": {
+            "type": "secret",
+            "description": "Your Telegram Bot Token from @BotFather"
         },
-        "bindings": {
-            "kv_namespaces": [
-                {
-                    "name": "TG_BOT_KV",
-                    "title": "TG_BOT_KV"
-                }
-            ],
-            "vars": [
-                {
-                    "name": "TELEGRAM_TOKEN",
-                    "description": "Your Bot Token from @BotFather on Telegram",
-                    "secret": true,
-                    "required": true
-                }
-            ]
+        "ACCESS_MODE": {
+            "type": "text",
+            "default": "public",
+            "description": "Access mode: 'public' or 'private'"
+        },
+        "ALLOWED_USER_IDS": {
+            "type": "text",
+            "default": "",
+            "description": "Comma-separated user IDs (for private mode)"
         }
-    }
+    },
+    "kv_namespaces": [
+        {
+            "binding": "TG_BOT_KV",
+            "description": "KV namespace for bot data"
+        }
+    ]
 }

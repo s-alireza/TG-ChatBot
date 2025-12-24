@@ -9,7 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const logsContent = document.getElementById('logs_output');
 
     // --- State ---
-    // TODO: UPDATE THIS AFTER DEPLOYING PROXY
     const DEFAULT_PROXY_URL = 'https://tg-bot-deploy-proxy.alirzw6070.workers.dev';
 
     // --- Event Listeners ---
@@ -110,8 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Step 1: Send Request to Proxy
             log("Contacting deployment proxy...", "info");
 
-            // Note: In a real streaming set up we'd read chunks. 
-            // For now, we await the full result (Proxy handles the sequence).
             const response = await fetch(`${proxyUrl}/deploy`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -130,37 +127,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 log("KV Namespace configured.", "success");
                 log("Worker code deployed.", "success");
 
-                const workerUrl = result.workerUrl;
-                log(`Worker URL: ${workerUrl}`, "info");
+                // Final Instructions
+                log("🎉 Deployment Complete!", "success");
+                log("", "info");
+                log("📋 TO ACTIVATE YOUR BOT:", "step");
+                log("1. Go to: dash.cloudflare.com/workers", "info");
+                log("2. Click on 'tg-chatbot' worker", "info");
+                log("3. Click the 'Visit' button at the top", "info");
+                log("", "info");
+                log("⏰ IMPORTANT: New workers take 2-5 minutes to go online.", "info");
+                log("   If you see an error, wait 1-2 mins and try again.", "info");
+                log("", "info");
+                log("✅ SUCCESS: You'll see 'Webhook Set Successfully ✅' when ready!", "info");
 
-                // MANUAL Verification Steps
-                log("👇 ALMOST DONE!", "step");
-                log("1. Click the 'Initialize Bot' button below.", "info");
-                log("2. A new tab will open showing 'Status'.", "info");
-                log("3. If you see 'Webhook Set', your bot is ready!", "info");
-
-                setStatus("✅ Deployment Successful! (Click below to Finish)", "success");
-
-                // Hide Deploy Button
-                deployBtn.classList.add('hidden');
-
-                // Create a fresh Link Button
-                const initLink = document.createElement('a');
-                initLink.href = workerUrl;
-                initLink.target = "_blank";
-                initLink.className = "deploy-btn";
-                // Force styling to ensure visibility
-                initLink.style.cssText = "background-color: #00d26a; color: white !important; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; margin-top: 1rem;";
-                initLink.innerHTML = `<span class="btn-text" style="font-weight: bold;">🔗 Initialize Bot (Set Webhook)</span>`;
-
-                // Append next to the hidden button
-                deployBtn.parentNode.appendChild(initLink);
-
-                initLink.addEventListener('click', () => {
-                    log("Opening bot status page...", "info");
-                });
-
-                log("🎉 Waiting for you to click Initialize...", "success");
+                setStatus("✅ Deployment Successful! Follow instructions above to activate.", "success");
 
             } else {
                 throw new Error(result.error || "Unknown deployment failure");

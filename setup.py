@@ -91,8 +91,27 @@ class SetupApp:
         subtitle = ttk.Label(self.main_frame, text="Enter your API keys and click Deploy!", font=('Segoe UI', 10, 'italic'))
         subtitle.pack(pady=(0, 20))
         
+        # === Web Setup Button (Recommended) ===
+        web_setup_btn = tk.Button(self.main_frame, text="🌐 Open Web Setup (Recommended)",
+                                  command=self.open_web_setup,
+                                  bg=self.success_color, fg=self.fg_color,
+                                  font=('Segoe UI', 11, 'bold'), relief='flat',
+                                  cursor='hand2', padx=20, pady=10)
+        web_setup_btn.pack(pady=(0, 15))
+        
+        ttk.Label(self.main_frame, text="OR use local deployment below:",
+                 font=('Segoe UI', 10, 'italic')).pack(pady=(0, 15))
+        
+        # === Cloudflare Section (First) ===
+        cf_frame = ttk.LabelFrame(self.main_frame, text="☁️ Cloudflare Configuration", padding=15)
+        cf_frame.pack(fill="x", pady=10)
+        
+        # API Token
+        self.create_input_row(cf_frame, "Cloudflare API Token", "cf_api_token",
+                             hint="Profile → API Tokens → Create Token (Edit Workers template)", show="•")
+        
         # === API Keys Section ===
-        api_frame = ttk.LabelFrame(self.main_frame, text="API Keys", padding=15)
+        api_frame = ttk.LabelFrame(self.main_frame, text="🔑 API Keys", padding=15)
         api_frame.pack(fill="x", pady=10)
         
         # Telegram Token
@@ -100,20 +119,12 @@ class SetupApp:
                              hint="Get from @BotFather on Telegram")
         
         # Groq API Key
-        self.create_input_row(api_frame, "Groq API Key", "groq_key",
-                             hint="console.groq.com/keys", show="•")
+        self.create_input_row(api_frame, "Groq API Key (optional)", "groq_key",
+                             hint="Get from console.groq.com/keys (or configure via bot later)", show="•")
         
         # Gemini API Key
         self.create_input_row(api_frame, "Gemini API Key (optional)", "gemini_key",
-                             hint="aistudio.google.com/app/apikey", show="•")
-        
-        # === Cloudflare Section ===
-        cf_frame = ttk.LabelFrame(self.main_frame, text="Cloudflare", padding=15)
-        cf_frame.pack(fill="x", pady=10)
-        
-        # API Token
-        self.create_input_row(cf_frame, "Cloudflare API Token", "cf_api_token",
-                             hint="Profile → API Tokens → Create Token (Edit Workers template)", show="•")
+                             hint="Get from aistudio.google.com/app/apikey (or configure via bot later)", show="•")
         
         # === Access Mode Section ===
         access_frame = ttk.LabelFrame(self.main_frame, text="Access Control", padding=15)
@@ -275,14 +286,18 @@ class SetupApp:
             except Exception as e:
                 self.log(f"⚠️ Error loading .env: {e}")
     
+    def open_web_setup(self):
+        """Open web setup tool in browser"""
+        import webbrowser
+        webbrowser.open("https://s-alireza.github.io/TG-ChatBot/")
+        self.log("🌐 Opening Web Setup Tool in your browser...")
+    
     def validate_inputs(self):
         """Validate required inputs"""
         errors = []
         
         if not self.telegram_token.get().strip():
             errors.append("Telegram Bot Token is required")
-        if not self.groq_key.get().strip():
-            errors.append("Groq API Key is required")
         if not self.cf_api_token.get().strip():
             errors.append("Cloudflare API Token is required")
         
@@ -377,21 +392,22 @@ class SetupApp:
                 
                 self.log("✅ Deployment successful!")
                 
-                # Step 5: Set webhook automatically
-                self.set_status("🔗 Setting up webhook...", self.fg_color)
-                self.log("\nStep 5: Setting up Telegram webhook...")
-                
-                worker_url = self.parse_worker_url(output)
-                if worker_url:
-                    self.auto_set_webhook(worker_url)
-                else:
-                    self.log("⚠️ Could not detect worker URL for webhook setup")
+                # Manual Activation Instructions
+                self.log("\n" + "="*50)
+                self.log("🎉 Deployment Complete!")
+                self.log("")
+                self.log("📋 TO ACTIVATE YOUR BOT:")
+                self.log("1. Go to: dash.cloudflare.com/workers")
+                self.log("2. Click on 'tg-chatbot' worker")
+                self.log("3. Click the 'Visit' button at the top")
+                self.log("")
+                self.log("⏰ IMPORTANT: New workers take 2-5 minutes to go online.")
+                self.log("   If you see an error, wait 1-2 mins and try again.")
+                self.log("")
+                self.log("✅ SUCCESS: You'll see 'Webhook Set Successfully ✅' when ready!")
                 
                 # Done!
-                self.set_status("✅ Bot deployed and ready!", self.success_color)
-                self.log("\n" + "="*50)
-                self.log("🎉 Your bot is now live!")
-                self.log("   Send a message to your bot on Telegram to test it.")
+                self.set_status("✅ Bot deployed! Follow instructions above to activate.", self.success_color)
                 
             except Exception as e:
                 self.log(f"❌ Error: {e}")
