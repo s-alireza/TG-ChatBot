@@ -34,6 +34,12 @@ export default {
             const accountId = await getAccount(cf_token);
             if (!accountId) throw new Error("Could not find Cloudflare Account ID. Check your Token permissions.");
 
+            // 2.5. Check if Subdomain exists (Required for workers.dev)
+            const preSubdomain = await getSubdomain(cf_token, accountId);
+            if (!preSubdomain) {
+                throw new Error("You haven't set up a *.workers.dev subdomain yet! Please go to Cloudflare Dashboard > Workers & Pages and set up your subdomain (on the right sidebar).");
+            }
+
             // 3. Get/Create KV Namespace
             const kvId = await setupKV(cf_token, accountId);
             if (!kvId) throw new Error("Failed to setup KV Namespace");
@@ -187,9 +193,13 @@ async function deployWorker(token: string, accountId: string, name: string, code
 
 async function enableSubdomain(token: string, accountId: string, name: string) {
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${name}/subdomain`;
-    await fetch(url, {
+    const res = await fetch(url, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ enabled: true })
     });
+    if (!res.ok) {
+        const error = await res.text();
+        throw new Error(`Failed to enable subdomain: ${res.status} ${error}`);
+    }
 }
