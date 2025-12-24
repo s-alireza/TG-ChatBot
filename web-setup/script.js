@@ -139,20 +139,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 log("2. A new tab will open showing 'Status'.", "info");
                 log("3. If you see 'Webhook Set', your bot is ready!", "info");
 
-                setStatus("✅ Deployment Successful! Please Initialize below.", "success");
+                setStatus("✅ Deployment Successful! (Click below to Finish)", "success");
 
-                // Change Button to Open Worker
-                deployBtn.disabled = false;
-                deployBtn.classList.add('status-success');
-                deployBtn.style.backgroundColor = "#00d26a"; // Green
-                deployBtn.querySelector('.btn-text').textContent = "🔗 Initialize Bot (Set Webhook)";
-                deployBtn.querySelector('.loader').classList.add('hidden');
+                // Hide Deploy Button
+                deployBtn.classList.add('hidden');
 
-                // Remove old listener and add new one
-                const newBtn = deployBtn.cloneNode(true);
-                deployBtn.parentNode.replaceChild(newBtn, deployBtn);
-                newBtn.addEventListener('click', () => {
-                    window.open(workerUrl, '_blank');
+                // Create a fresh Link Button
+                const initLink = document.createElement('a');
+                initLink.href = workerUrl;
+                initLink.target = "_blank";
+                initLink.className = "deploy-btn";
+                // Force styling to ensure visibility
+                initLink.style.cssText = "background-color: #00d26a; color: white !important; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; margin-top: 1rem;";
+                initLink.innerHTML = `<span class="btn-text" style="font-weight: bold;">🔗 Initialize Bot (Set Webhook)</span>`;
+
+                // Append next to the hidden button
+                deployBtn.parentNode.appendChild(initLink);
+
+                initLink.addEventListener('click', () => {
                     log("Opening bot status page...", "info");
                 });
 
