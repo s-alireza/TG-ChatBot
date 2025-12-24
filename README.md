@@ -41,15 +41,7 @@ The easiest way! No installation needed:
 
 ---
 
-### Method 2: Deploy Button
-
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/s-alireza/TG-ChatBot)
-
-After deployment, follow Step 4 above to activate the webhook.
-
----
-
-### Method 3: Local Clone (For Developers)
+### Method 2: Local Setup
 
 ```bash
 git clone https://github.com/s-alireza/TG-ChatBot
