@@ -1,5 +1,10 @@
 # 🤖 TG-ChatBot
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub stars](https://img.shields.io/github/stars/s-alireza/TG-ChatBot?style=social)](https://github.com/s-alireza/TG-ChatBot)
+[![GitHub issues](https://img.shields.io/github/issues/s-alireza/TG-ChatBot)](https://github.com/s-alireza/TG-ChatBot/issues)
+[![GitHub forks](https://img.shields.io/github/forks/s-alireza/TG-ChatBot?style=social)](https://github.com/s-alireza/TG-ChatBot/fork)
+
 **A free, open-source AI chatbot for Telegram with multi-model support, voice messages, and image analysis.**
 
 Deploy your personal AI assistant to Cloudflare Workers in minutes—no server costs, scales automatically!
@@ -8,9 +13,10 @@ Deploy your personal AI assistant to Cloudflare Workers in minutes—no server c
 
 ## ✨ Features
 
-- 🧠 **Multi-Model AI**: Llama 4, Llama 3.3 70B, Qwen 3, Gemini 2.5/3.0, and more
+- 🧠 **Multi-Model AI**: **GPT-4.5 Turbo**, **Llama 4 Scout**, **Llama 3.3 70B**, **Qwen 3**, **Gemini 2.5/3.0**, and more
 - 🎤 **Voice Messages**: Send and receive voice messages
-- 📷 **Vision AI**: Analyze photos and PDFs with Llama Vision
+- 📷 **Vision AI**: Analyze photos and PDFs with **Llama Vision**
+- 📄 **PDF Support**: Comprehend and analyze PDF documents
 - 🌐 **Multi-Language**: English, Persian, Russian, Chinese, Arabic, Spanish
 - 💾 **Conversation History**: Maintains context across messages
 - 🔒 **Access Control**: Public or private mode with user whitelist
@@ -20,6 +26,16 @@ Deploy your personal AI assistant to Cloudflare Workers in minutes—no server c
 ---
 
 ## 🚀 Quick Start (For Users)
+
+<div align="center">
+
+### **👉 [Launch Web Setup Tool](https://s-alireza.github.io/TG-ChatBot/) 👈**
+
+**No installation required • Deploy in 2 minutes • 100% Free**
+
+</div>
+
+---
 
 ### Method 1: Web Setup Tool (Recommended) ⭐
 
