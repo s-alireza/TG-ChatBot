@@ -1405,7 +1405,7 @@ async function callGroq(apiKey: string, systemPrompt: string, history: ChatMessa
         headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
-            'User-Agent': 'TinaBot/1.0'
+            'User-Agent': 'TGChatBot/1.0'
         },
         body: JSON.stringify({
             model: model,
