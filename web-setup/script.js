@@ -133,18 +133,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 const workerUrl = result.workerUrl;
                 log(`Worker URL: ${workerUrl}`, "info");
 
-                // Client-side verification (Avoids proxy timeout)
-                log("⏳ Waiting for DNS propagation (this checks the webhook)...", "step");
-                const isReady = await waitForWorker(workerUrl);
+                // MANUAL Verification Steps
+                log("👇 ALMOST DONE!", "step");
+                log("1. Click the 'Initialize Bot' button below.", "info");
+                log("2. A new tab will open showing 'Status'.", "info");
+                log("3. If you see 'Webhook Set', your bot is ready!", "info");
 
-                if (isReady) {
-                    log("✅ Webhook set successfully!", "success");
-                    log("🎉 Deployment Complete! Your bot is live.", "success");
-                    setStatus("✅ Deployment Successful!", "success");
-                } else {
-                    log("⚠️ Verification timed out. Please check the URL manually in 1-2 minutes.", "info");
-                    setStatus("⚠️ Deployment Complete (Propagation Delayed)", "success");
-                }
+                setStatus("✅ Deployment Successful! Please Initialize below.", "success");
+
+                // Change Button to Open Worker
+                deployBtn.disabled = false;
+                deployBtn.classList.add('status-success');
+                deployBtn.style.backgroundColor = "#00d26a"; // Green
+                deployBtn.querySelector('.btn-text').textContent = "🔗 Initialize Bot (Set Webhook)";
+                deployBtn.querySelector('.loader').classList.add('hidden');
+
+                // Remove old listener and add new one
+                const newBtn = deployBtn.cloneNode(true);
+                deployBtn.parentNode.replaceChild(newBtn, deployBtn);
+                newBtn.addEventListener('click', () => {
+                    window.open(workerUrl, '_blank');
+                    log("Opening bot status page...", "info");
+                });
+
+                log("🎉 Waiting for you to click Initialize...", "success");
+
             } else {
                 throw new Error(result.error || "Unknown deployment failure");
             }
@@ -179,24 +192,5 @@ document.addEventListener('DOMContentLoaded', () => {
         deployBtn.disabled = false;
         deployBtn.querySelector('.btn-text').textContent = "🚀 Deploy to Cloudflare";
         deployBtn.querySelector('.loader').classList.add('hidden');
-    }
-
-    async function waitForWorker(url) {
-        const maxRetries = 30; // 3 minutes (assuming 6s delay)
-        for (let i = 0; i < maxRetries; i++) {
-            try {
-                // We fetch the root URL. If it returns 200 (HTML), the worker is running.
-                const res = await fetch(url);
-                if (res.ok) {
-                    return true;
-                }
-            } catch (e) {
-                // Fetch failed (DNS not ready)
-            }
-            await new Promise(r => setTimeout(r, 6000));
-            // Update log only every 5th try to avoid spam? No, user needs feedback.
-            if (i % 2 === 0) log(`Pinging worker... (${i + 1}/${maxRetries})`, "info");
-        }
-        return false;
     }
 });
