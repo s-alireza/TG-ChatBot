@@ -49,6 +49,12 @@ header h1 {
     font-style: italic;
 }
 
+.github-star-container {
+    margin-top: 1rem;
+    height: 30px;
+    /* Prevent layout shift */
+}
+
 a {
     color: var(--accent-color);
     text-decoration: none;
@@ -94,7 +100,8 @@ a:hover {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     color: var(--text-color);
-    font-family: 'Consolas', monospace; /* Good for API keys */
+    font-family: 'Consolas', monospace;
+    /* Good for API keys */
     font-size: 0.95rem;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -147,7 +154,7 @@ a:hover {
     text-align: center;
 }
 
-.radio-option input:checked + .radio-label {
+.radio-option input:checked+.radio-label {
     background-color: rgba(233, 69, 96, 0.15);
     border-color: var(--accent-color);
 }
@@ -216,8 +223,13 @@ a:hover {
     min-height: 1.5rem;
 }
 
-.status-success { color: var(--success-color); }
-.status-error { color: var(--error-color); }
+.status-success {
+    color: var(--success-color);
+}
+
+.status-error {
+    color: var(--error-color);
+}
 
 /* Logs */
 .logs-container {
@@ -253,15 +265,32 @@ a:hover {
     border-top: 1px solid var(--border-color);
 }
 
-.log-line { margin-bottom: 0.25rem; }
-.log-info { color: #81ecec; }
-.log-success { color: #00d26a; }
-.log-error { color: #ff7675; }
-.log-step { font-weight: bold; color: #fff; margin-top: 0.5rem; display: block; }
+.log-line {
+    margin-bottom: 0.25rem;
+}
+
+.log-info {
+    color: #81ecec;
+}
+
+.log-success {
+    color: #00d26a;
+}
+
+.log-error {
+    color: #ff7675;
+}
+
+.log-step {
+    font-weight: bold;
+    color: #fff;
+    margin-top: 0.5rem;
+    display: block;
+}
 
 /* Loader */
 .loader {
-    border: 3px solid rgba(255,255,255,0.3);
+    border: 3px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
     border-top: 3px solid #fff;
     width: 20px;
@@ -271,8 +300,13 @@ a:hover {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 footer {
@@ -302,13 +336,16 @@ footer {
 ::-webkit-scrollbar {
     width: 8px;
 }
+
 ::-webkit-scrollbar-track {
     background: var(--bg-color);
 }
+
 ::-webkit-scrollbar-thumb {
     background: var(--border-color);
     border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
     background: #3e5070;
 }

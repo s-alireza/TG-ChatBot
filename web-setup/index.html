@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap"
         rel="stylesheet">
+    <!-- GitHub Buttons Script -->
+    <script async defer src="https://buttons.github.io/buttons.js"></script>
 </head>
 
 <body>
@@ -18,25 +20,17 @@
         <header>
             <h1>🤖 TG-ChatBot Setup</h1>
             <p class="subtitle">Enter your API keys and deploy your bot in seconds</p>
+
+            <div class="github-star-container">
+                <a class="github-button" href="https://github.com/s-alireza/TG-ChatBot"
+                    data-color-scheme="no-preference: light; light: light; dark: dark;" data-icon="octicon-star"
+                    data-size="large" data-show-count="true" aria-label="Star s-alireza/TG-ChatBot on GitHub">Star</a>
+            </div>
         </header>
 
         <!-- Main Form -->
         <main>
-            <!-- API Keys Section -->
-            <section class="card">
-                <h2>🔑 API Keys</h2>
-
-                <div class="input-group">
-                    <label for="telegram_token">Telegram Bot Token</label>
-                    <input type="password" id="telegram_token" placeholder="From @BotFather" autocomplete="off">
-                    <small>Get this from <a href="https://t.me/BotFather" target="_blank">@BotFather</a> on
-                        Telegram</small>
-                </div>
-
-
-            </section>
-
-            <!-- Cloudflare Section -->
+            <!-- Cloudflare Section (Moved to Top) -->
             <section class="card">
                 <h2>☁️ Cloudflare Configuration</h2>
 
@@ -46,6 +40,18 @@
                         autocomplete="off">
                     <small>Create at <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank">User
                             Profile > API Tokens</a>. Use "Edit Cloudflare Workers" template.</small>
+                </div>
+            </section>
+
+            <!-- API Keys Section -->
+            <section class="card">
+                <h2>🔑 API Keys</h2>
+
+                <div class="input-group">
+                    <label for="telegram_token">Telegram Bot Token</label>
+                    <input type="password" id="telegram_token" placeholder="From @BotFather" autocomplete="off">
+                    <small>Get this from <a href="https://t.me/BotFather" target="_blank">@BotFather</a> on
+                        Telegram</small>
                 </div>
             </section>
 
@@ -110,7 +116,10 @@
         </main>
 
         <footer>
-            <p>Created with ❤️ for TG-ChatBot</p>
+            <p>
+                Created with ❤️ by <a href="https://github.com/s-alireza" target="_blank">s-alireza</a> for
+                <a href="https://github.com/s-alireza/TG-ChatBot" target="_blank">TG-ChatBot</a>
+            </p>
         </footer>
     </div>
     <script src="script.js"></script>
