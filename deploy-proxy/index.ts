@@ -35,8 +35,8 @@ export default {
             if (!accountId) throw new Error("Could not find Cloudflare Account ID. Check your Token permissions.");
 
             // 2.5. Check if Subdomain exists (Required for workers.dev)
-            const preSubdomain = await getSubdomain(cf_token, accountId);
-            if (!preSubdomain) {
+            const subdomain = await getSubdomain(cf_token, accountId);
+            if (!subdomain) {
                 throw new Error("You haven't set up a *.workers.dev subdomain yet! Please go to Cloudflare Dashboard > Workers & Pages and set up your subdomain (on the right sidebar).");
             }
 
@@ -68,8 +68,7 @@ export default {
             // 6. Enable Subdomain (Critical!)
             await enableSubdomain(cf_token, accountId, workerName);
 
-            // 7. Trigger Webhook Setup (Ping the new worker)
-            const subdomain = await getSubdomain(cf_token, accountId);
+            // 7. Construct URL (Reuse validated subdomain)
             const workerUrl = `https://${workerName}.${subdomain}.workers.dev`;
 
             // 7. Return Success (Client will trigger webhook)
