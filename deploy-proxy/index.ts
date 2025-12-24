@@ -59,41 +59,33 @@ export default {
                 throw new Error("Deployment failed: " + JSON.stringify(deployResult.errors));
             }
 
-            // 6. Set Webhook
-            // We need the worker URL. 
-            // Usually it's [name].[subdomain].workers.dev
-            // but we can try to guess it or call the worker.
-            // Deployment result usually contains the script info but not the full URL directly.
-            // We will Try to construct it or ask the user to check.
-            // Actually, we can fetch the script details to get the subdomain?
-            // Let's assume standard format: https://tg-chatbot.<subdomain>.workers.dev
-            // To get subdomain: /accounts/{id}/workers/subdomain
+            // 6. Enable Subdomain (Critical!)
+            await enableSubdomain(cf_token, accountId, workerName);
 
+            // 7. Trigger Webhook Setup (Ping the new worker)
             const subdomain = await getSubdomain(cf_token, accountId);
             const workerUrl = `https://${workerName}.${subdomain}.workers.dev`;
 
-            // Call the worker to set webhook (it has a /setup-webhook endpoint or similar logic in /)
-            // Our worker code (src/index.ts) has auto-setup logic on GET /.
-            // So we just ping it.
-            let webhookSet = false;
+            // Wait 5s for propagation
+            await new Promise(r => setTimeout(r, 5000));
+
+            let webhookStatus = "⚠️ Webhook could not be set automatically. Check worker logs.";
             try {
-                // Wait a bit for propagation?
-                // Just pinging the root URL triggers the checking logic in the worker
                 const ping = await fetch(workerUrl);
-                if (ping.ok) webhookSet = true;
+                if (ping.ok) {
+                    webhookStatus = "✅ Webhook set successfully!";
+                }
             } catch (e) {
-                console.error("Webhook trigger failed", e);
+                console.log("Webhook ping failed:", e);
             }
 
             return new Response(JSON.stringify({
                 success: true,
-                worker_url: workerUrl,
-                webhook_set: webhookSet
+                workerUrl: workerUrl,
+                message: "Deployment Successful",
+                webhookStatus: webhookStatus
             }), {
-                headers: {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*"
-                }
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
             });
 
         } catch (e: any) {
@@ -191,4 +183,13 @@ async function deployWorker(token: string, accountId: string, name: string, code
     });
 
     return await res.json() as any;
+}
+
+async function enableSubdomain(token: string, accountId: string, name: string) {
+    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${name}/subdomain`;
+    await fetch(url, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: true })
+    });
 }
